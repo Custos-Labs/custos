@@ -147,6 +147,13 @@ jobs:
       - name: Identity coverage gate
         run: pnpm --filter @verixa/identity run test:coverage
 
+      # Same pattern applied to packages/sessions (Issue 097): session and
+      # token logic is among the highest-stakes code in the system, so it's
+      # held to the same enforced floor as identity rather than trusted to
+      # `pnpm test` alone.
+      - name: Sessions coverage gate
+        run: pnpm --filter @verixa/sessions run test:coverage
+
   # Verifies the *other* database strategy. The `ci` job above points
   # TEST_DATABASE_URL at a service container, so it never exercises the
   # Testcontainers path in database-harness.ts (Issue 047). This job
