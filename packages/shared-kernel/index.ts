@@ -10,6 +10,7 @@ export type {
 export {
   AccountLockedError,
   AuthenticationError,
+  AuthorizationError,
   ConflictError,
   DomainError,
   NotFoundError,
