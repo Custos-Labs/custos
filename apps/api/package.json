@@ -31,9 +31,11 @@
     "@verixa/credentials": "workspace:*",
     "@verixa/database": "workspace:*",
     "@verixa/identity": "workspace:*",
+    "@verixa/sessions": "workspace:*",
     "@verixa/shared-kernel": "workspace:*",
     "@verixa/stellar-anchor": "workspace:*",
-    "fastify": "^5.12.1"
+    "fastify": "^5.12.1",
+    "ioredis": "^5.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

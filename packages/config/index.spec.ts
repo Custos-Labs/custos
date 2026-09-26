@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { ConfigError, loadConfig } from "./index.js";
 
+const VALID_SESSION_SECRET = "a".repeat(32);
+
 describe("loadConfig", () => {
   it("produces a typed config object from a fully-specified environment", () => {
     const config = loadConfig({
@@ -10,6 +12,8 @@ describe("loadConfig", () => {
       HOST: "127.0.0.1",
       LOG_LEVEL: "warn",
       DATABASE_URL: "postgres://user:pass@db.example.com:5432/verixa",
+      REDIS_URL: "redis://redis.example.com:6379",
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
     });
 
     expect(config).toEqual({
@@ -20,18 +24,23 @@ describe("loadConfig", () => {
       DATABASE_URL: "postgres://user:pass@db.example.com:5432/verixa",
       DATABASE_POOL_SIZE: 10,
       DATABASE_POOL_TIMEOUT_SECONDS: 10,
+      REDIS_URL: "redis://redis.example.com:6379",
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
     });
   });
 
   it("coerces PORT from a string to a number", () => {
-    const config = loadConfig({ PORT: "4000" });
+    const config = loadConfig({
+      PORT: "4000",
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
+    });
 
     expect(config.PORT).toBe(4000);
     expect(typeof config.PORT).toBe("number");
   });
 
   it("applies defaults when optional variables are missing", () => {
-    const config = loadConfig({});
+    const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
 
     expect(config).toEqual({
       NODE_ENV: "development",
@@ -41,11 +50,13 @@ describe("loadConfig", () => {
       DATABASE_URL: "postgres://verixa:verixa@localhost:5432/verixa",
       DATABASE_POOL_SIZE: 10,
       DATABASE_POOL_TIMEOUT_SECONDS: 10,
+      REDIS_URL: "redis://localhost:6379",
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
     });
   });
 
   it("returns an immutable object", () => {
-    const config = loadConfig({});
+    const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
 
     expect(() => {
       // @ts-expect-error — the returned config is Readonly; this must fail to typecheck too.
@@ -71,11 +82,16 @@ describe("loadConfig", () => {
   });
 
   it("rejects a port outside the valid TCP range", () => {
-    expect(() => loadConfig({ PORT: "70000" })).toThrowError(ConfigError);
+    expect(() =>
+      loadConfig({ PORT: "70000", SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET }),
+    ).toThrowError(ConfigError);
   });
 
   it("coerces pool settings from strings and applies defaults", () => {
-    const config = loadConfig({ DATABASE_POOL_SIZE: "25" });
+    const config = loadConfig({
+      DATABASE_POOL_SIZE: "25",
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
+    });
 
     expect(config.DATABASE_POOL_SIZE).toBe(25);
     expect(config.DATABASE_POOL_TIMEOUT_SECONDS).toBe(10);
@@ -84,14 +100,55 @@ describe("loadConfig", () => {
   it("rejects a pool size above a stock Postgres max_connections", () => {
     // Above ~100 the failure mode changes from "requests queue" to
     // "connections are refused outright", which is much harder to diagnose.
-    expect(() => loadConfig({ DATABASE_POOL_SIZE: "500" })).toThrowError(ConfigError);
+    expect(() =>
+      loadConfig({ DATABASE_POOL_SIZE: "500", SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET }),
+    ).toThrowError(ConfigError);
   });
 
   it("rejects a non-positive pool size", () => {
-    expect(() => loadConfig({ DATABASE_POOL_SIZE: "0" })).toThrowError(ConfigError);
+    expect(() =>
+      loadConfig({ DATABASE_POOL_SIZE: "0", SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET }),
+    ).toThrowError(ConfigError);
   });
 
   it("rejects a malformed DATABASE_URL", () => {
-    expect(() => loadConfig({ DATABASE_URL: "not-a-url" })).toThrowError(ConfigError);
+    expect(() =>
+      loadConfig({ DATABASE_URL: "not-a-url", SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET }),
+    ).toThrowError(ConfigError);
+  });
+
+  it("applies the default REDIS_URL when missing", () => {
+    const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
+
+    expect(config.REDIS_URL).toBe("redis://localhost:6379");
+  });
+
+  it("rejects a malformed REDIS_URL", () => {
+    expect(() =>
+      loadConfig({ REDIS_URL: "not-a-url", SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET }),
+    ).toThrowError(ConfigError);
+  });
+
+  it("requires SESSION_ACCESS_TOKEN_SECRET, with no default", () => {
+    expect(() => loadConfig({})).toThrowError(ConfigError);
+
+    try {
+      loadConfig({});
+      expect.unreachable("loadConfig should have thrown");
+    } catch (error) {
+      expect((error as ConfigError).message).toContain("SESSION_ACCESS_TOKEN_SECRET");
+    }
+  });
+
+  it("rejects a SESSION_ACCESS_TOKEN_SECRET shorter than 32 characters", () => {
+    expect(() => loadConfig({ SESSION_ACCESS_TOKEN_SECRET: "too-short" })).toThrowError(
+      ConfigError,
+    );
+  });
+
+  it("accepts a SESSION_ACCESS_TOKEN_SECRET of exactly 32 characters", () => {
+    const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
+
+    expect(config.SESSION_ACCESS_TOKEN_SECRET).toBe(VALID_SESSION_SECRET);
   });
 });
