@@ -50,3 +50,4 @@ export class TotpSecret {
     return "TotpSecret { <redacted> }";
   }
 }
+export interface TotpSecret { readonly value: string; readonly provisioningUri: string; }
