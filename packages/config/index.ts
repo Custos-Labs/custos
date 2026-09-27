@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import { ConfigError } from "./config-error.js";
+
+export { ConfigError } from "./config-error.js";
+export { loadSigningKeys, SIGNING_KEY_ALGORITHMS, SIGNING_KEYS_ENV_VAR } from "./signing-keys.js";
+export type { SigningKeyAlgorithm, SigningKeyConfig } from "./signing-keys.js";
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
@@ -99,14 +105,6 @@ const envSchema = z.object({
 
 /** The fully validated, immutable application configuration. */
 export type Config = Readonly<z.infer<typeof envSchema>>;
-
-/** Thrown by {@link loadConfig} when required environment variables are missing or invalid. */
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConfigError";
-  }
-}
 
 /**
  * Validates `process.env` (or a supplied source, for testing) against the
