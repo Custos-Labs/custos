@@ -29,3 +29,11 @@ export {
   permitOverrides,
 } from "./domain/services/combining-algorithms.js";
 export type { CombiningAlgorithm } from "./domain/services/combining-algorithms.js";
+
+// Application: services
+export { lintPolicySet } from "./application/services/policy-linter.js";
+export type {
+  LinterFinding,
+  LinterFindingType,
+  LintResult,
+} from "./application/services/policy-linter.js";
