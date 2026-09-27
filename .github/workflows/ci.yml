@@ -29,6 +29,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+      # Backs the sessions revocation deny-list integration tests (Issue 088) —
+      # a real Redis, so "does revoke/isRevoke/TTL-expiry behave against the
+      # actual store" is answered by the store, not a fake. Same rationale and
+      # localhost reachability as the Postgres service above.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     env:
       TEST_DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_test
       # Prisma reads DATABASE_URL for both `generate` and `migrate` (Issue
@@ -42,6 +55,13 @@ jobs:
       # container would make every such test skip and still report success.
       # This flag turns "no database" into a hard failure in CI only.
       REQUIRE_DATABASE_TESTS: "1"
+      # Points the sessions Redis integration tests at the service container.
+      TEST_REDIS_URL: redis://localhost:6379
+      # Same reasoning as REQUIRE_DATABASE_TESTS: Redis-backed tests skip
+      # themselves when no Redis is reachable, which is right locally and wrong
+      # here — a misconfigured service container would make them skip and still
+      # report green. This turns "no Redis" into a hard failure in CI only.
+      REQUIRE_REDIS_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
 

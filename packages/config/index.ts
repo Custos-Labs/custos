@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+import { ConfigError } from "./config-error.js";
+
+export { ConfigError } from "./config-error.js";
+export { loadSigningKeys, SIGNING_KEY_ALGORITHMS, SIGNING_KEYS_ENV_VAR } from "./signing-keys.js";
+export type { SigningKeyAlgorithm, SigningKeyConfig } from "./signing-keys.js";
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
@@ -49,18 +55,25 @@ const envSchema = z.object({
    * the real problem.
    */
   DATABASE_POOL_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(10),
+
+  /**
+   * Maximum simultaneous active sessions a single user may hold (Issue 094).
+   * Logging in past this limit evicts the least-recently-active session —
+   * see `IssueSession` in `@verixa/sessions`.
+   *
+   * `0` (the default) disables enforcement entirely, per that issue's own
+   * acceptance criterion. Unlike `DATABASE_POOL_SIZE`, there is no safe
+   * non-zero default to fall back to: a banking-style deployment might want
+   * `1`, a consumer product might never want this on, and guessing wrong in
+   * either direction is a product decision this package has no basis to
+   * make on a deployment's behalf. Zero is the only default that cannot
+   * surprise anyone who has not deliberately opted in.
+   */
+  SESSION_MAX_CONCURRENT_SESSIONS: z.coerce.number().int().min(0).default(0),
 });
 
 /** The fully validated, immutable application configuration. */
 export type Config = Readonly<z.infer<typeof envSchema>>;
-
-/** Thrown by {@link loadConfig} when required environment variables are missing or invalid. */
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConfigError";
-  }
-}
 
 /**
  * Validates `process.env` (or a supplied source, for testing) against the
