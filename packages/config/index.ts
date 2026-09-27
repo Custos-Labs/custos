@@ -82,6 +82,19 @@ const envSchema = z.object({
   SESSION_ACCESS_TOKEN_SECRET: z
     .string()
     .min(32, "must be at least 32 characters — generate one with `openssl rand -base64 48`"),
+   * Maximum simultaneous active sessions a single user may hold (Issue 094).
+   * Logging in past this limit evicts the least-recently-active session —
+   * see `IssueSession` in `@verixa/sessions`.
+   *
+   * `0` (the default) disables enforcement entirely, per that issue's own
+   * acceptance criterion. Unlike `DATABASE_POOL_SIZE`, there is no safe
+   * non-zero default to fall back to: a banking-style deployment might want
+   * `1`, a consumer product might never want this on, and guessing wrong in
+   * either direction is a product decision this package has no basis to
+   * make on a deployment's behalf. Zero is the only default that cannot
+   * surprise anyone who has not deliberately opted in.
+   */
+  SESSION_MAX_CONCURRENT_SESSIONS: z.coerce.number().int().min(0).default(0),
 });
 
 /** The fully validated, immutable application configuration. */

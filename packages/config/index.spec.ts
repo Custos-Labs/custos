@@ -26,6 +26,7 @@ describe("loadConfig", () => {
       DATABASE_POOL_TIMEOUT_SECONDS: 10,
       REDIS_URL: "redis://redis.example.com:6379",
       SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
+      SESSION_MAX_CONCURRENT_SESSIONS: 0,
     });
   });
 
@@ -52,6 +53,7 @@ describe("loadConfig", () => {
       DATABASE_POOL_TIMEOUT_SECONDS: 10,
       REDIS_URL: "redis://localhost:6379",
       SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
+      SESSION_MAX_CONCURRENT_SESSIONS: 0,
     });
   });
 
@@ -150,5 +152,22 @@ describe("loadConfig", () => {
     const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
 
     expect(config.SESSION_ACCESS_TOKEN_SECRET).toBe(VALID_SESSION_SECRET);
+  });
+
+  it("defaults SESSION_MAX_CONCURRENT_SESSIONS to 0 (disabled)", () => {
+    const config = loadConfig({});
+
+    expect(config.SESSION_MAX_CONCURRENT_SESSIONS).toBe(0);
+  });
+
+  it("coerces SESSION_MAX_CONCURRENT_SESSIONS from a string", () => {
+    const config = loadConfig({ SESSION_MAX_CONCURRENT_SESSIONS: "3" });
+
+    expect(config.SESSION_MAX_CONCURRENT_SESSIONS).toBe(3);
+    expect(typeof config.SESSION_MAX_CONCURRENT_SESSIONS).toBe("number");
+  });
+
+  it("rejects a negative SESSION_MAX_CONCURRENT_SESSIONS", () => {
+    expect(() => loadConfig({ SESSION_MAX_CONCURRENT_SESSIONS: "-1" })).toThrowError(ConfigError);
   });
 });

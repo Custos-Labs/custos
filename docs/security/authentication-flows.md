@@ -298,10 +298,17 @@ The danger is not that the reset is insecure — it is that it is _believed to
 have worked_. A user who knows they are still compromised takes further action;
 one who thinks they are safe does not.
 
-Sessions are Phase 05, so `SessionRevoker` has no real implementation yet.
-`NoSessionsRevoker` is genuinely correct today — there are no sessions to
-revoke — and the call site exists now so that "remember to revoke sessions"
-never has to be remembered.
+`@verixa/sessions` now has a real `LogoutEverywhere` use case (see
+"Sessions" below), but `apps/api/src/composition-root.ts` still wires
+`NoSessionsRevoker` rather than an adapter over it. That is not an oversight:
+`SessionRevoker` is defined here, in `@verixa/credentials`, and adapting it to
+`LogoutEverywhere` needs a real `SessionRepository`/`RevocationList` pair —
+Prisma- and Redis-backed, respectively — which do not exist yet. Wiring the
+adapter without them would compile but silently do nothing at runtime, which
+is worse than the explicit, honest no-op `NoSessionsRevoker` already is.
+`NoSessionsRevoker` remains correct until that infrastructure lands, and the
+call site exists now so that "remember to revoke sessions" never has to be
+remembered.
 
 When revocation fails, the error says so rather than reporting success: the
 password _did_ change, and the user needs to know their old sessions survived.
@@ -324,12 +331,84 @@ while every reset token in the system lands in a log aggregator.
 ## What login does not yet do
 
 `POST /auth/login` returns the authenticated user and **no session or token**.
-Sessions are Phase 05.
+Wiring session issuance into the login route is still open work — see
+"Sessions" below for what the package underneath it now does.
 
-Until then the endpoint is deliberately not enough to stay logged in with.
-Returning a placeholder token would be worse than returning none: clients would
-store it, and replacing it with a real one later would be a breaking change to
-a field that never worked.
+Until the route is wired up, it is deliberately not enough to stay logged in
+with. Returning a placeholder token would be worse than returning none:
+clients would store it, and replacing it with a real one later would be a
+breaking change to a field that never worked.
+
+## Sessions
+
+Implementation: `packages/sessions/`. Nothing in `apps/api` calls into this
+package yet — `POST /auth/login` does not issue a session, so everything
+below is exercised by the package's own tests, not by an HTTP request. It is
+documented here anyway, in the same file as login, because a session's
+lifecycle is inseparable from the login flow that will eventually create one.
+
+### Metadata is a history, not a snapshot
+
+`Session` records the device/IP/user-agent seen at issuance, and appends a
+new observation on `RefreshAccessToken` only when what the client presents
+has changed since the last one. It is a history rather than an overwritten
+field for exactly the reason `AuditLogEntry` chains rather than timestamps:
+overwriting the previous value would make "did this session's location ever
+change" unanswerable from stored data. A future impossible-travel check
+(Phase 06+) needs the _sequence_ of observations, not just the latest one —
+capturing it now, before any consumer of it exists, is the same call
+`AuditLogEntry`'s hash chain and the credential lockout counter both made:
+build the primitive before the feature that reads it, because retrofitting
+history onto data that was only ever overwritten is not possible after the
+fact.
+
+Refresh token rotation and reuse detection (the `RefreshToken` entity and
+`RefreshTokenReuseDetected` event already sitting, unused, in this package)
+are deliberately **not** part of this — `RefreshAccessToken` re-signs the
+access token against the session's _existing_ refresh token hash rather than
+rotating it. Building rotation was a bigger change than the metadata-capture
+issue asked for, and folding it in here would have coupled two independent
+pieces of work behind one pull request. It can be layered on top later
+without touching the metadata-capture behavior.
+
+### Logout and LogoutEverywhere both revoke two things, not one
+
+Verixa's access tokens are stateless JWTs, verified without a database round
+trip. That is what makes them fast, and it is also what makes "revoke a
+session" harder than it sounds: revoking the _refresh_ token (so no further
+`RefreshAccessToken` call succeeds) does nothing about an access token
+already issued, which keeps authenticating requests until its own `exp`
+regardless. `Logout` and `LogoutEverywhere` therefore both do two things —
+revoke the session (or every session) and denylist its `currentAccessToken`
+through a `RevocationList` — because doing only one would leave a live
+credential behind. See the class docs on `Logout` for the full reasoning, and
+`docs/guides/database.md`/the `RevocationList` port for why this is a
+separate mechanism from the session store rather than a column on it.
+
+`LogoutEverywhere` only touches sessions that existed at the moment it reads
+them — a login racing immediately after is a different, later row it never
+saw, and is unaffected by design. See the class docs for why that is the
+right behavior rather than a gap.
+
+### Concurrent session limits evict, they do not refuse
+
+`IssueSession` takes an optional `maxConcurrentSessions` (surfaced as
+`SESSION_MAX_CONCURRENT_SESSIONS` in `@verixa/config`, default `0` /
+disabled). Reaching the limit does not reject the new login — it evicts the
+least-recently-active existing session first, denylists that session's access
+token the same way `Logout` does, and logs the eviction via
+`SessionAuditLogger`. Refusing the new login instead was the alternative
+considered and rejected: a user who has genuinely forgotten about an old
+signed-in device should not be locked out of a brand-new one, and eviction
+gets the same security property (bounding how many sessions can be alive at
+once) without that cost.
+
+The limit is a constructor parameter on `IssueSession`, not a value baked
+into the domain, for the same reason `AuthenticateWithPassword` takes an
+injectable `LockoutPolicy`: it is a per-deployment product decision (a
+banking app and a consumer SaaS product reasonably disagree on it), and the
+composition root — not this package — is where environment configuration
+belongs.
 
 ## Related
 
