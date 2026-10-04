@@ -15,7 +15,6 @@ export default mergeConfig(
         // report a meaningless 0% for a file with zero total statements.
         exclude: [
           "**/application/ports/**",
-          "**/infrastructure/fakes/**",
           "index.ts",
           // Database adapters are covered by the contract suite in
           // prisma-repositories.spec.ts, which runs only where a real
