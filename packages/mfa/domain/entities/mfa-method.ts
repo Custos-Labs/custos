@@ -1,7 +1,4 @@
 import { createId, type Id } from "@verixa/shared-kernel";
-import { createId, type Id, Result, ValidationError } from "@verixa/shared-kernel";
-
-import type { MfaMethodType } from "../value-objects/mfa-method-type.js";
 
 import type { MfaMethodType } from "../value-objects/mfa-method-type.js";
 
@@ -58,11 +55,6 @@ export class MfaMethod {
     userId: Id<"UserId">,
     type: MfaMethodType,
 export type MfaMethodId = Id<"MfaMethodId">;
-export type MfaMethodStatus = "pending" | "active" | "disabled";
-
-export interface MfaMethodProps {
-  readonly id: MfaMethodId;
-  readonly userId: Id<"UserId">;
 export type UserId = Id<"UserId">;
 export type MfaMethodType = "totp" | "webauthn" | "backup_codes";
 export type MfaMethodStatus = "pending" | "active" | "disabled";
@@ -80,135 +72,6 @@ export interface MfaMethodProps {
   readonly secret: string | null;
   readonly lastUsedAt: Date | null;
   readonly createdAt: Date;
-  readonly lastUsedAt?: Date | undefined;
-  readonly failedAttempts: number;
-  readonly lockedUntil?: Date | undefined;
-}
-
-export class MfaMethod {
-  private constructor(public readonly props: MfaMethodProps) {}
-
-  get id(): MfaMethodId {
-    return this.props.id;
-  }
-
-  get userId(): Id<"UserId"> {
-    return this.props.userId;
-  }
-
-  get type(): MfaMethodType {
-    return this.props.type;
-  }
-
-  get status(): MfaMethodStatus {
-    return this.props.status;
-  }
-
-  get createdAt(): Date {
-    return this.props.createdAt;
-  }
-
-  get lastUsedAt(): Date | undefined {
-    return this.props.lastUsedAt;
-  }
-
-  get failedAttempts(): number {
-    return this.props.failedAttempts;
-  }
-
-  get lockedUntil(): Date | undefined {
-    return this.props.lockedUntil;
-  }
-
-  static createPending(
-    userId: Id<"UserId">,
-    type: MfaMethodType,
-    now: Date = new Date(),
-  ): MfaMethod {
-    return new MfaMethod({
-      id: createId<"MfaMethodId">(),
-      userId,
-      type,
-      status: "pending",
-      createdAt: now,
-      failedAttempts: 0,
-      lockedUntil: undefined,
-      lastUsedAt: undefined,
-    });
-  }
-
-  static createActive(
-    userId: Id<"UserId">,
-    type: MfaMethodType,
-    now: Date = new Date(),
-  ): MfaMethod {
-    return new MfaMethod({
-      id: createId<"MfaMethodId">(),
-      userId,
-      type,
-      status: "active",
-      createdAt: now,
-      failedAttempts: 0,
-      lockedUntil: undefined,
-      lastUsedAt: undefined,
-    });
-  }
-
-  static reconstitute(props: MfaMethodProps): MfaMethod {
-    return new MfaMethod(props);
-  }
-
-  activate(): MfaMethod {
-    if (this.props.status !== "pending") {
-      throw new Error("Only pending methods can be activated.");
-    }
-    return new MfaMethod({
-      ...this.props,
-      status: "active",
-      failedAttempts: 0,
-      lockedUntil: undefined,
-    });
-  }
-
-  disable(): MfaMethod {
-    return new MfaMethod({
-      ...this.props,
-      status: "disabled",
-    });
-  }
-
-  recordUse(now: Date = new Date()): MfaMethod {
-    if (this.props.status !== "active") {
-      throw new Error("Only active methods can satisfy an MFA challenge.");
-    }
-    return new MfaMethod({
-      ...this.props,
-      lastUsedAt: now,
-      failedAttempts: 0,
-      lockedUntil: undefined,
-    });
-  }
-
-  recordFailedAttempt(now: Date = new Date()): MfaMethod {
-    const attempts = this.props.failedAttempts + 1;
-    const lockDurationMs = attempts >= 5 ? 60 * 1000 * Math.pow(2, attempts - 5) : 0;
-    const lockedUntil =
-      lockDurationMs > 0
-        ? new Date(now.getTime() + Math.min(lockDurationMs, 60 * 60 * 1000))
-        : undefined;
-
-    return new MfaMethod({
-      ...this.props,
-      failedAttempts: attempts,
-      lockedUntil,
-    });
-  }
-
-  isLockedAt(now: Date = new Date()): boolean {
-    if (!this.props.lockedUntil) return false;
-    return now.getTime() < this.props.lockedUntil.getTime();
-  }
-}
   readonly updatedAt: Date;
   readonly failedAttempts: number;
   readonly lockedUntil: Date | null;
@@ -232,7 +95,7 @@ const MAX_LOCKOUT_MS = 60 * 60 * 1_000;
  * helpers the persistence adapter needs.
  *
  * Transitions mutate the instance and return `this` so callers may either chain
- * (`method.activate().recordUse(step)`) or ignore the return value — the two
+ * (`method.activate().recordTotpUse(step)`) or ignore the return value — the two
  * call styles the surviving call sites use.
  */
 export class MfaMethod {
@@ -387,6 +250,35 @@ export class MfaMethod {
     return MfaMethod.create(userId, "totp", secret.value, now);
   }
 
+  /**
+   * Enrolls a method that is already `active`.
+   *
+   * TOTP enrolls as `pending` and is confirmed by a first successful code,
+   * because the server cannot otherwise know the user stored the secret.
+   * WebAuthn has no equivalent step: the registration ceremony verifies an
+   * attestation before anything is persisted, so a method that exists at all
+   * is one the authenticator has already demonstrated it holds.
+   */
+  public static createActive(
+    userId: UserId,
+    type: MfaMethodType,
+    now: Date = new Date(),
+  ): MfaMethod {
+    return new MfaMethod({
+      id: createId<"MfaMethodId">(),
+      userId,
+      type,
+      status: "active",
+      secret: null,
+      lastUsedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      failedAttempts: 0,
+      lockedUntil: null,
+      lastUsedStep: null,
+    });
+  }
+
   /** Rehydrates a method from persistence. */
   public static load(props: MfaMethodProps): MfaMethod {
     return new MfaMethod(props);
@@ -452,27 +344,46 @@ export class MfaMethod {
   }
 
   /**
-   * Records a successful challenge at a particular TOTP time step.
+   * Records a successful challenge, clearing the failure counter and lockout.
    *
-   * Rejects replays: clock-drift tolerance widens the window in which a single
-   * code is valid, so a code whose step is not strictly greater than the last
-   * consumed step is refused. Resets the failure counter on success.
+   * This carries no replay protection of its own, because not every factor
+   * needs it here. A WebAuthn assertion is protected by the authenticator's
+   * monotonic `signCount`, which lives on `WebAuthnCredential` and is checked
+   * there — a counter that fails to advance is what clone detection looks for.
+   * TOTP has no such per-credential counter and must use
+   * {@link recordTotpUse} instead.
    */
-  recordUse(matchedStep: number, now: Date = new Date()): this {
+  recordUse(now: Date = new Date()): this {
     if (this.props.status !== "active") {
       throw new Error("Only active methods can be used for verification.");
-    }
-    if (this.props.lastUsedStep !== null && matchedStep <= this.props.lastUsedStep) {
-      throw new Error("Replay detected: step has already been consumed.");
     }
     this.props = {
       ...this.props,
       lastUsedAt: now,
       failedAttempts: 0,
       lockedUntil: null,
-      lastUsedStep: matchedStep,
       updatedAt: now,
     };
+    return this;
+  }
+
+  /**
+   * Records a successful TOTP challenge at a particular time step.
+   *
+   * Rejects replays: clock-drift tolerance widens the window in which a single
+   * code is valid, so a code whose step is not strictly greater than the last
+   * consumed step is refused. The step is checked before anything is mutated,
+   * so a rejected replay leaves the method exactly as it was.
+   */
+  recordTotpUse(matchedStep: number, now: Date = new Date()): this {
+    if (this.props.status !== "active") {
+      throw new Error("Only active methods can be used for verification.");
+    }
+    if (this.props.lastUsedStep !== null && matchedStep <= this.props.lastUsedStep) {
+      throw new Error("Replay detected: step has already been consumed.");
+    }
+    this.recordUse(now);
+    this.props = { ...this.props, lastUsedStep: matchedStep };
     return this;
   }
 }

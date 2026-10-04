@@ -1,7 +1,7 @@
 import { AccountLockedError, Result, ValidationError, asId } from "@verixa/shared-kernel";
 
-import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
+import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 
 export interface ConfirmTotpEnrollmentCommand {
   readonly methodId: string;

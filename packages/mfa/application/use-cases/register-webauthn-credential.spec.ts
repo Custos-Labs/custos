@@ -3,9 +3,9 @@ import crypto from "node:crypto";
 import { Result, asId } from "@verixa/shared-kernel";
 import { describe, beforeEach, expect, it } from "vitest";
 
-import { InMemoryMfaMethodRepository } from "../../infrastructure/fakes/in-memory-mfa-method-repository.js";
 import { InMemoryWebAuthnChallengeRepository } from "../../infrastructure/fakes/in-memory-webauthn-challenge-repository.js";
 import { InMemoryWebAuthnCredentialRepository } from "../../infrastructure/fakes/in-memory-webauthn-credential-repository.js";
+import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
 import { WebAuthnAttestationVerifier } from "../../infrastructure/webauthn/attestation-verifier.js";
 import { encodeCbor } from "../../infrastructure/webauthn/cbor.js";
 

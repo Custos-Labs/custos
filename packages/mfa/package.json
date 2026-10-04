@@ -7,11 +7,11 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "node -e \"console.log('packages/mfa is QUARANTINED - see docs/QUARANTINE.md. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
-    "typecheck": "node -e \"console.log('packages/mfa is QUARANTINED - see docs/QUARANTINE.md. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
-    "test": "node -e \"console.log('packages/mfa is QUARANTINED - see docs/QUARANTINE.md. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
-    "test:coverage": "node -e \"console.log('packages/mfa is QUARANTINED - see docs/QUARANTINE.md. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
-    "lint": "node -e \"console.log('packages/mfa is QUARANTINED - see docs/QUARANTINE.md. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\""
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@node-rs/argon2": "^2.0.2",

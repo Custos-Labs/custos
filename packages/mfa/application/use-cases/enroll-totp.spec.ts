@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { MfaMethod } from "../../domain/entities/mfa-method.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
+
 import { EnrollTotp } from "./enroll-totp.js";
 
 describe("EnrollTotp", () => {
@@ -11,22 +12,24 @@ describe("EnrollTotp", () => {
     const savedMethods: MfaMethod[] = [];
 
     const fakeRepo: MfaMethodRepository = {
-      save: async (method) => {
+      save: (method) => {
         savedMethods.push(method);
+        return Promise.resolve();
       },
-      findById: async () => undefined,
-      findActiveByUserId: async () => [],
-      findPendingByUserId: async () => [],
-      findAllByUserId: async () => [],
-      delete: async () => {},
+      findById: () => Promise.resolve(undefined),
+      findActiveByUserId: () => Promise.resolve([]),
+      findPendingByUserId: () => Promise.resolve([]),
+      findAllByUserId: () => Promise.resolve([]),
+      delete: () => Promise.resolve(),
     };
 
     const fakeAlgo: TotpAlgorithm = {
-      generateSecret: async (accountName) => ({
-        value: "FAKEBASE32SECRET",
-        provisioningUri: `otpauth://totp/Verixa:${accountName}?secret=FAKEBASE32SECRET&issuer=Verixa`,
-      }),
-      verify: async () => null,
+      generateSecret: (accountName) =>
+        Promise.resolve({
+          value: "FAKEBASE32SECRET",
+          provisioningUri: `otpauth://totp/Verixa:${accountName}?secret=FAKEBASE32SECRET&issuer=Verixa`,
+        }),
+      verify: () => Promise.resolve(null),
     };
 
     const useCase = new EnrollTotp(fakeRepo, fakeAlgo);
