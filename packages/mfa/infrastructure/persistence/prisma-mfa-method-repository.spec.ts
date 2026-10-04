@@ -46,6 +46,11 @@ describe.skipIf(database === undefined)("PrismaMfaMethodRepository (real Postgre
   let prisma: PrismaClient;
 
   beforeAll(async () => {
+    // The repository encrypts secrets on the way in, and `encrypt` refuses to
+    // run without a key rather than falling back to a constant one. The value
+    // is irrelevant here as long as it is a valid 32-byte AES-256 key.
+    process.env["MFA_ENCRYPTION_KEY"] ??= Buffer.alloc(32, 7).toString("base64");
+
     prisma = new PrismaClient({ datasources: { db: { url: database as string } } });
     await prisma.$connect();
   }, 60_000);

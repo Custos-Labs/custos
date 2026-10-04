@@ -6,32 +6,6 @@ export default mergeConfig(
   baseConfig,
   defineConfig({
     test: {
-      name: "@verixa/mfa",
-      coverage: {
-        exclude: [
-          "**/application/ports/**",
-          "index.ts",
-          "**/infrastructure/fakes/**",
-          "**/infrastructure/persistence/**",
-        ],
-        thresholds: {
-          statements: 90,
-          lines: 90,
-          functions: 85,
-          branches: 85,
-        },
-      },
-    },
-  },
-});
-import { defineConfig, mergeConfig } from "vitest/config";
-
-import baseConfig from "../../vitest.config.js";
-
-export default mergeConfig(
-  baseConfig,
-  defineConfig({
-    test: {
       name: "@verixa/identity",
       coverage: {
         // Interface-only files have no executable statements to cover — a
@@ -41,6 +15,7 @@ export default mergeConfig(
         // report a meaningless 0% for a file with zero total statements.
         exclude: [
           "**/application/ports/**",
+          "**/infrastructure/fakes/**",
           "index.ts",
           // Database adapters are covered by the contract suite in
           // prisma-repositories.spec.ts, which runs only where a real

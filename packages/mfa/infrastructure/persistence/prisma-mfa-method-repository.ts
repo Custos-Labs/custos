@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@verixa/database";
+
 import type { MfaMethodRepository } from "../../application/ports/mfa-method-repository.js";
 import type { MfaMethod, MfaMethodId, UserId } from "../../domain/entities/mfa-method.js";
+
 import { withMappedErrors } from "./error-mapper.js";
 import { MfaMethodMapper } from "./mfa-method-mapper.js";
 
@@ -14,8 +16,8 @@ export class PrismaMfaMethodRepository implements MfaMethodRepository {
     await withMappedErrors("MfaMethod", () =>
       this.prisma.mfaMethod.upsert({
         where: { id },
-        create: row as any,
-        update: withoutId as any,
+        create: row,
+        update: withoutId,
       }),
     );
   }

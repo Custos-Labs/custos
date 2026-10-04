@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
+
 import { VerifyTotpChallenge } from "./verify-totp-challenge.js";
 
 describe("VerifyTotpChallenge", () => {
@@ -11,22 +12,23 @@ describe("VerifyTotpChallenge", () => {
     const savedMethods = new Map<string, MfaMethod>();
 
     const fakeRepo: MfaMethodRepository = {
-      save: async (method) => {
+      save: (method) => {
         savedMethods.set(method.id, method);
+        return Promise.resolve();
       },
-      findById: async (id) => savedMethods.get(id),
-      findActiveByUserId: async () => [],
-      findPendingByUserId: async () => [],
-      findAllByUserId: async () => [],
-      delete: async () => {},
+      findById: (id) => Promise.resolve(savedMethods.get(id)),
+      findActiveByUserId: () => Promise.resolve([]),
+      findPendingByUserId: () => Promise.resolve([]),
+      findAllByUserId: () => Promise.resolve([]),
+      delete: () => Promise.resolve(),
     };
 
     const fakeAlgo: TotpAlgorithm = {
-      generateSecret: async () => ({ value: "SECRET", provisioningUri: "uri" }),
-      verify: async (_secret, code) => {
-        if (code === "VALID1") return 1000;
-        if (code === "VALID2") return 1001; // Next step
-        return null;
+      generateSecret: () => Promise.resolve({ value: "SECRET", provisioningUri: "uri" }),
+      verify: (_secret, code) => {
+        if (code === "VALID1") return Promise.resolve(1000);
+        if (code === "VALID2") return Promise.resolve(1001); // Next step
+        return Promise.resolve(null);
       },
     };
 
@@ -59,7 +61,7 @@ describe("VerifyTotpChallenge", () => {
     // Method already used at step 1000
     const method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" })
       .activate()
-      .recordUse(1000, new Date());
+      .recordTotpUse(1000, new Date());
     await fakeRepo.save(method);
 
     // Try to reuse a code that matches step 1000

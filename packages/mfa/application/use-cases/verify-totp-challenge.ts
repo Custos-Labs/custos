@@ -1,7 +1,7 @@
 import { AccountLockedError, Result, ValidationError, asId } from "@verixa/shared-kernel";
 
-import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
+import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 
 export interface VerifyTotpChallengeCommand {
   readonly methodId: string;
@@ -61,10 +61,10 @@ export class VerifyTotpChallenge {
 
     try {
       // Record use updates lastUsedAt and enforces replay protection against the matchedStep
-      const verifiedMethod = method.recordUse(matchedStep, now);
+      const verifiedMethod = method.recordTotpUse(matchedStep, now);
       await this.mfaMethodRepository.save(verifiedMethod);
       return Result.ok(undefined);
-    } catch (err) {
+    } catch {
       // Replay detected
       const updatedMethod = method.recordFailedAttempt(now);
       await this.mfaMethodRepository.save(updatedMethod);
