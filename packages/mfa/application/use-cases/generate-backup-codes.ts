@@ -1,11 +1,12 @@
 import { Result } from "@verixa/shared-kernel";
+
+import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
 import {
   BackupCodeSet,
   type BackupCodeGenerationResult,
 } from "../../domain/services/backup-code-set.js";
-import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
-import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
+import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 
 export interface GenerateBackupCodesCommand {
   readonly userId: string;

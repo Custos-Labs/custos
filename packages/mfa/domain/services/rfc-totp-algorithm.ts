@@ -2,9 +2,10 @@ import crypto from "node:crypto";
 
 import { Result } from "@verixa/shared-kernel";
 
-import type { TotpAlgorithm, TotpSecretLike } from "./totp-algorithm.js";
-import { base32 } from "./base32.js";
 import { TotpSecret } from "../value-objects/totp-secret.js";
+
+import { base32 } from "./base32.js";
+import type { TotpAlgorithm, TotpSecretLike } from "./totp-algorithm.js";
 
 const PERIOD_SECONDS = 30;
 const DIGITS = 6;
@@ -17,15 +18,27 @@ const DIGITS = 6;
  * asynchronous {@link TotpAlgorithm} port consumed by the use cases.
  */
 export class Rfc6238TotpAlgorithm implements TotpAlgorithm {
-  async generateSecret(accountName: string, issuer = "Verixa"): Promise<TotpSecretLike> {
+  generateSecret(accountName: string, issuer = "Verixa"): Promise<TotpSecretLike> {
     const secret = TotpSecret.generate();
-    return {
+    return Promise.resolve({
       value: secret.value,
       provisioningUri: secret.getProvisioningUri(accountName, issuer),
-    };
+    });
   }
 
-  async verify(secretValue: string, code: string, driftWindow = 1): Promise<number | null> {
+  verify(secretValue: string, code: string, driftWindow = 1): Promise<number | null> {
+    return Promise.resolve(Rfc6238TotpAlgorithm.verifySync(secretValue, code, driftWindow));
+  }
+
+  /**
+   * The synchronous core of {@link verify}: returns the matched time step, or
+   * `null` if the code matches no step within the drift window.
+   *
+   * Separated out because nothing here awaits — the port is asynchronous for
+   * implementations that must reach a remote verifier, and pretending this one
+   * does would make a missing `await` indistinguishable from a real bug.
+   */
+  static verifySync(secretValue: string, code: string, driftWindow = 1): number | null {
     const secret = TotpSecret.fromString(secretValue);
     if (!Result.isOk(secret)) {
       return null;

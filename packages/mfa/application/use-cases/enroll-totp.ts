@@ -1,4 +1,4 @@
-import { Result, type Id, asId } from "@verixa/shared-kernel";
+import { Result, asId } from "@verixa/shared-kernel";
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";

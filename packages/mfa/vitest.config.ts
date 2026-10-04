@@ -6,7 +6,7 @@ export default mergeConfig(
   baseConfig,
   defineConfig({
     test: {
-      name: "@verixa/identity",
+      name: "@verixa/mfa",
       coverage: {
         // Interface-only files have no executable statements to cover — a
         // TypeScript `interface` is erased entirely at compile time, so
@@ -42,7 +42,6 @@ export default mergeConfig(
           branches: 85,
         },
       },
-      name: "@verixa/credentials",
     },
   }),
 );

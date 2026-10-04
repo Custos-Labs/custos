@@ -1,6 +1,8 @@
 import { Result } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
+
 import { TotpSecret } from "../value-objects/totp-secret.js";
+
 import { Rfc6238TotpAlgorithm } from "./rfc-totp-algorithm.js";
 
 describe("Rfc6238TotpAlgorithm", () => {

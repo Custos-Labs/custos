@@ -1,8 +1,9 @@
 import { Result } from "@verixa/shared-kernel";
-import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
+
 import type { UserId } from "../../domain/entities/mfa-method.js";
-import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
+import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
+import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 
 export interface ConsumeBackupCodeCommand {
   readonly userId: string;
@@ -36,10 +37,8 @@ export class ConsumeBackupCode {
       return Result.ok({ kind: "failed" });
     }
 
-    let hashes: string[];
-    try {
-      hashes = JSON.parse(backupMethod.secret);
-    } catch {
+    const hashes = parseStoredHashes(backupMethod.secret);
+    if (hashes === null) {
       return Result.ok({ kind: "failed" });
     }
 
@@ -77,4 +76,29 @@ export class ConsumeBackupCode {
 
     return Result.ok({ kind: "ok", codesRemaining: hashes.length });
   }
+}
+
+/**
+ * Reads the stored backup-code hashes.
+ *
+ * `JSON.parse` is typed `any`, so the shape is checked rather than asserted: a
+ * secret holding valid JSON of the wrong shape (an object, or an array with a
+ * non-string in it) would otherwise flow on as a `string[]` and only fail
+ * later, inside the verification loop, where it would read as a hashing fault
+ * rather than corrupt data. Returns `null` for anything unusable, which the
+ * caller treats as a failed attempt.
+ */
+function parseStoredHashes(secret: string): string[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(secret);
+  } catch {
+    return null;
+  }
+
+  if (!Array.isArray(parsed) || !parsed.every((h) => typeof h === "string")) {
+    return null;
+  }
+
+  return parsed;
 }

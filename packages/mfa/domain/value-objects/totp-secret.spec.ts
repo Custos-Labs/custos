@@ -1,5 +1,6 @@
 import { Result } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
+
 import { TotpSecret } from "../value-objects/totp-secret.js";
 
 describe("TotpSecret", () => {
