@@ -240,6 +240,7 @@ Issue 131) registers permissions in the system catalog during module initializat
 Because bootstrap routines run on every server startup, registering a pre-existing permission
 is designed to be idempotent: the use case performs a catalog check via `PermissionRepository.findByKey(key)`
 and returns the existing permission rather than failing with a conflict error.
+
 ## Use cases that delegate their rules: the review flow
 
 `ClaimNextReviewCase`, `ApproveVerification`, `RejectVerification` and
