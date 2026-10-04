@@ -16,7 +16,6 @@ import {
   AuthenticateWithPassword,
   ConfirmEmailVerification,
   ConfirmPasswordReset,
-  NoSessionsRevoker,
   NullCredentialNotifier,
   PrismaCredentialsUnitOfWork,
   RegisterUserWithPassword,
@@ -56,6 +55,21 @@ import {
   type StellarNetwork,
   type TransactionSigner,
 } from "@verixa/stellar-anchor";
+
+import {
+  IssueSession,
+  JwtTokenSigner,
+  ListActiveSessions,
+  Logout,
+  LogoutEverywhere,
+  PrismaSessionRepository,
+  RedisRevocationList,
+  RefreshAccessToken,
+  SessionExpiryPolicy,
+  SessionsPackageRevoker,
+  SigningKeyProvider,
+} from "@verixa/sessions";
+import { Redis } from "ioredis";
 
 import { registerAuditSubscribers } from "./composition/register-audit-subscribers.js";
 
@@ -242,11 +256,21 @@ export interface MfaUseCases {
   readonly verifyWebAuthnAssertion: VerifyWebAuthnAssertion;
 }
 
+/** Session lifecycle, token issuance/rotation, and revocation (Phase 05). */
+export interface SessionUseCases {
+  readonly issueSession: IssueSession;
+  readonly refreshAccessToken: RefreshAccessToken;
+  readonly logout: Logout;
+  readonly logoutEverywhere: LogoutEverywhere;
+  readonly listActiveSessions: ListActiveSessions;
+}
+
 export interface Container {
   readonly prisma: PrismaClient;
   readonly eventPublisher: DomainEventPublisher;
   readonly identity: IdentityUseCases;
   readonly credentials: CredentialUseCases;
+  readonly sessions: SessionUseCases;
   readonly audit: AuditUseCases;
   /**
    * Drains any queued audit writes, then releases the database connection.
@@ -254,6 +278,7 @@ export interface Container {
    */
   readonly mfa: MfaUseCases;
   /** Releases the database connection. Call on shutdown. */
+  /** Releases the database connection (and the Redis connection, if one was opened). Call on shutdown. */
   readonly dispose: () => Promise<void>;
 }
 
@@ -297,9 +322,6 @@ export function buildContainer(
   const passwordHasher = new Argon2PasswordHasher();
   const credentialsUnitOfWork = new PrismaCredentialsUnitOfWork(prisma);
 
-  // Both of these are placeholders for later phases, and both are wired to
-  // real call sites rather than left as TODOs.
-  //
   // `NullCredentialNotifier` delivers nothing — mail is Phase 14. It is
   // deliberately silent rather than a stub that logs "would have sent:
   // <token>", which is the version that survives in production for a
@@ -319,6 +341,40 @@ export function buildContainer(
   const credentialNotifier = new NullCredentialNotifier();
   const sessionRevoker = new NoSessionsRevoker();
   const rateLimiter = new NoopRateLimiter();
+  const credentialNotifier = new NullCredentialNotifier();
+
+  // Sessions (Phase 05). One signer/key-provider/expiry-policy for the
+  // process, same reasoning as the password hasher above: these are fixed
+  // configuration, not per-request state.
+  const config = loadConfig();
+  const signingKeyProvider = new SigningKeyProvider({ secret: config.SESSION_ACCESS_TOKEN_SECRET });
+  const tokenSigner = new JwtTokenSigner(signingKeyProvider);
+  const sessionExpiryPolicy = SessionExpiryPolicy.default();
+
+  // `lazyConnect: true`: the client is constructed here but does not open a
+  // socket until the first command actually runs. That is what lets
+  // `buildContainer()` succeed as a pure "wire the object graph" step even
+  // when no Redis is reachable yet (a fresh checkout, a boot smoke test) —
+  // the same property `new PrismaClient(...)` already has for Postgres.
+  const redis = new Redis(config.REDIS_URL, { lazyConnect: true });
+  const revocationList = new RedisRevocationList(redis);
+  const sessionRepository = new PrismaSessionRepository(prisma);
+
+  const issueSession = new IssueSession(sessionRepository, tokenSigner, sessionExpiryPolicy);
+  const refreshAccessToken = new RefreshAccessToken(
+    sessionRepository,
+    tokenSigner,
+    revocationList,
+    sessionExpiryPolicy,
+  );
+  const logout = new Logout(sessionRepository, revocationList);
+  const logoutEverywhere = new LogoutEverywhere(sessionRepository, revocationList);
+  const listActiveSessions = new ListActiveSessions(sessionRepository, sessionExpiryPolicy);
+
+  // Replaces `NoSessionsRevoker`, exactly as that class's own doc comment
+  // anticipated: a password reset now actually invalidates the sessions it
+  // was always supposed to.
+  const sessionRevoker = new SessionsPackageRevoker(logoutEverywhere);
 
   // Audit recording. Failures are logged and never propagated -- see
   // RecordAuditEvent on why a failed audit write must not fail the operation
@@ -477,12 +533,25 @@ export function buildContainer(
       registerWebAuthnCredential,
       verifyWebAuthnAssertion,
     },
+    sessions: {
+      issueSession,
+      refreshAccessToken,
+      logout,
+      logoutEverywhere,
+      listActiveSessions,
+    },
     dispose: async () => {
       // Drained *before* disconnecting, and only because the batched writer
       // may hold entries that are not in the database yet. Skipping this is
       // the one way the queue's bounded delay becomes permanent data loss.
       await batchedWriter?.stop();
       await prisma.$disconnect();
+      // `disconnect()`, not `quit()`: `quit()` sends a command, which would
+      // force the lazy connection this container never used to actually open
+      // one just to close it again immediately. A container built but never
+      // used to touch a session (this file's own boot smoke test, most unit
+      // tests) should be able to shut down without ever having reached Redis.
+      redis.disconnect();
     },
   };
 }

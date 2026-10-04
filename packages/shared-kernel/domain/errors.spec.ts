@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { ConflictError, DomainError, NotFoundError, ValidationError } from "./errors.js";
+import {
+  AuthorizationError,
+  ConflictError,
+  DomainError,
+  NotFoundError,
+  ValidationError,
+} from "./errors.js";
 
 describe("ValidationError", () => {
   it("carries a stable code and http status hint", () => {
@@ -59,12 +65,32 @@ describe("ConflictError", () => {
   });
 });
 
+describe("AuthorizationError", () => {
+  it("carries a stable code and http status hint", () => {
+    const error = new AuthorizationError("not your session");
+
+    expect(error.code).toBe("AUTHORIZATION_FAILED");
+    expect(error.httpStatusHint).toBe(403);
+  });
+
+  it("serializes to a predictable JSON shape", () => {
+    const error = new AuthorizationError("not your session");
+
+    expect(JSON.parse(JSON.stringify(error))).toEqual({
+      code: "AUTHORIZATION_FAILED",
+      message: "not your session",
+      httpStatusHint: 403,
+    });
+  });
+});
+
 describe("instanceof narrowing", () => {
   it("every subclass is a DomainError and a native Error", () => {
     const errors: DomainError[] = [
       new ValidationError("x"),
       new NotFoundError("x"),
       new ConflictError("x"),
+      new AuthorizationError("x"),
     ];
 
     for (const error of errors) {
