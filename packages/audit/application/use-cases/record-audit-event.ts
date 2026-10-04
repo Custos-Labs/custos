@@ -2,7 +2,6 @@ import { Result } from "@verixa/shared-kernel";
 
 import type { AuditAction, AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
 import { AuditLogEntry as Entry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
-import { AuditLogEntry as Entry } from "../../domain/entities/audit-log-entry.js";
 import { AuditMetadata, rejectionReasonOf } from "../../domain/value-objects/audit-metadata.js";
 import type { AuditLogRepository } from "../ports/audit-log-repository.js";
 
@@ -120,7 +119,7 @@ export class RecordAuditEvent implements AuditRecorder {
           action: command.action,
           actorId: command.actorId,
           subjectId: command.subjectId,
-          metadata: command.metadata ?? {},
+          metadata: metadataFor(command),
           occurredAt: command.occurredAt,
           previous,
         });
@@ -133,14 +132,6 @@ export class RecordAuditEvent implements AuditRecorder {
         // Lost the race. Loop re-reads the head, so the next attempt links
         // onto whatever the winning writer put there.
       }
-      const entry = Entry.append({
-        action: command.action,
-        actorId: command.actorId,
-        subjectId: command.subjectId,
-        metadata: metadataFor(command),
-        previous,
-      });
-
       this.onError(
         new Error(
           `Audit append lost ${String(this.maxAttempts)} consecutive chain races and was abandoned.`,
@@ -209,6 +200,8 @@ export async function recordAuditEventBatch(
     onError(error);
     return [];
   }
+}
+
 function metadataFor(command: RecordAuditEventCommand): Readonly<Record<string, string>> {
   const created = AuditMetadata.create(command.metadata ?? {});
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
 
-import { Keypair } from "@stellar/stellar-sdk";
 import { PrismaClient } from "@verixa/database";
 import { Result } from "@verixa/shared-kernel";
 import { StellarHashAnchor } from "@verixa/stellar-anchor";
@@ -135,7 +134,7 @@ function buildVerifier(): AnchorVerifierPort {
   // so verification asks for no credentials — the same reasoning as the
   // anchoring CLI's verify path, and the reason an external auditor can run
   // this check without being handed anything.
-  return new StellarHashAnchor({ secretKey: Keypair.random().secret(), network });
+  return new StellarHashAnchor({ network });
 }
 
 async function main(): Promise<void> {
@@ -149,7 +148,9 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
 
   const verify = new VerifyAuditChain(
-    new PrismaAuditLogRepository(prisma.auditLogEntry),
+    new PrismaAuditLogRepository(prisma.auditLogEntry, (work) =>
+      prisma.$transaction((tx) => work(tx.auditLogEntry)),
+    ),
     options.checkAnchors
       ? new PrismaAnchorRecordRepository(prisma.anchorRecord, randomUUID)
       : undefined,

@@ -63,7 +63,7 @@ function fakeDatabase(): { table: AuditDelegate; rows: AuditRowInput[] } {
     findMany: (args) =>
       Promise.resolve(
         rows
-          .filter((row) => row.sequence >= args.where.sequence.gte)
+          .filter((row) => row.sequence >= (args.where?.sequence?.gte ?? 0))
           .sort((a, b) => a.sequence - b.sequence)
           .slice(0, args.take),
       ),
