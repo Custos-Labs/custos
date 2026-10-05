@@ -369,7 +369,10 @@ jobs:
         run: docker build -f apps/api/Dockerfile -t verixa-api:ci .
 
       - name: Run container
-        run: docker run -d --name verixa-api -p 3000:3000 verixa-api:ci
+        run: |
+          docker run -d --name verixa-api -p 3000:3000 \
+            -e SESSION_ACCESS_TOKEN_SECRET="ci-smoke-test-secret-at-least-32-characters" \
+            verixa-api:ci
 
       - name: Wait for /health
         run: |
