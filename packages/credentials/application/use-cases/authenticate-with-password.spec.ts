@@ -1,13 +1,36 @@
 import { Email, type User } from "@verixa/identity";
-import { Result } from "@verixa/shared-kernel";
+import type { MfaEnforcementLevel } from "@verixa/mfa";
+import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
 import { InMemoryCredentialsUnitOfWork } from "../../infrastructure/testing/in-memory-credentials-unit-of-work.js";
 import type { PasswordHasher } from "../ports/password-hasher.js";
 
-import { AuthenticateWithPassword } from "./authenticate-with-password.js";
+import {
+  AuthenticateWithPassword,
+  type AuthenticateWithPasswordSuccessResult,
+} from "./authenticate-with-password.js";
 import { RegisterUserWithPassword } from "./register-user-with-password.js";
+
+/**
+ * Narrows the success union to the plain (no-MFA-challenge) branch.
+ *
+ * `execute()`'s success type covers three shapes -- a plain login, an MFA
+ * challenge, and an enrollment prompt -- so `.value.user`/`.value.rehashed`
+ * do not exist on the type without first ruling out the other two. Every
+ * caller here either passes no `mfaChecker` or configures one that reports no
+ * active methods and an `optional`/`disabled` policy, so the plain branch is
+ * the only one these tests can ever actually observe; this makes that
+ * assumption explicit instead of asserting past it with a cast.
+ */
+function expectPlainLogin(
+  value: AuthenticateWithPasswordSuccessResult,
+): value is { readonly user: User; readonly rehashed: boolean; readonly status?: undefined } {
+  expect(value.status).toBeUndefined();
+  return value.status === undefined;
+}
 
 // Weak parameters, for the same reason the registration spec uses them: these
 // tests exercise orchestration and disclosure, not hashing strength. The
@@ -29,8 +52,8 @@ describe("AuthenticateWithPassword", () => {
     // instance. Sharing one would let the first test warm the cache for the
     // rest and quietly disarm the timing test below.
     hasher = new Argon2PasswordHasher(FAST);
-    register = new RegisterUserWithPassword(unitOfWork, hasher);
-    authenticate = new AuthenticateWithPassword(unitOfWork, hasher);
+    register = new RegisterUserWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+    authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter());
 
     const registered = await register.execute({
       email: EMAIL,
@@ -46,6 +69,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.user.email.value).toBe(EMAIL);
     });
 
@@ -69,7 +93,49 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.user.status).toBe("pending");
+    });
+
+    it("logs in unchanged when no MFA and optional/disabled policy", async () => {
+      const mfaChecker = {
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
+        listActiveMethods: () => Promise.resolve([]),
+      };
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
+
+      expect(Result.isOk(result)).toBe(true);
+      if (!Result.isOk(result)) return;
+      expect(result.value.status).toBeUndefined();
+    });
+
+    it("always issues a challenge when user has active methods", async () => {
+      const mfaChecker = {
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
+        listActiveMethods: () => Promise.resolve([{ id: "m1", type: "totp" }]),
+      };
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
+
+      expect(Result.isOk(result)).toBe(true);
+      if (!Result.isOk(result)) return;
+      expect(result.value.status).toBe("mfa_challenge");
+      if (result.value.status !== "mfa_challenge") return;
+      expect(result.value.methods).toHaveLength(1);
+    });
+
+    it("routes required-but-unenrolled users to enrollment and never grants a session", async () => {
+      const mfaChecker = {
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("required"),
+        listActiveMethods: () => Promise.resolve([]),
+      };
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
+
+      expect(Result.isOk(result)).toBe(true);
+      if (!Result.isOk(result)) return;
+      expect(result.value.status).toBe("enrollment_required");
     });
   });
 
@@ -178,7 +244,7 @@ describe("AuthenticateWithPassword", () => {
         },
         needsRehash: (encodedHash) => hasher.needsRehash(encodedHash),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, counting);
+      const useCase = new AuthenticateWithPassword(unitOfWork, counting, new NoopRateLimiter());
 
       await useCase.execute({ email: EMAIL, password: "wrong password entirely" });
       const afterWrongPassword = verifications;
@@ -197,7 +263,7 @@ describe("AuthenticateWithPassword", () => {
       // hasher configured with different ones — which looks like it works,
       // costs the wrong amount, and leaves the side channel open.
       const expensive = new Argon2PasswordHasher({ ...FAST, timeCost: 3 });
-      const useCase = new AuthenticateWithPassword(unitOfWork, expensive);
+      const useCase = new AuthenticateWithPassword(unitOfWork, expensive, new NoopRateLimiter());
 
       const result = await useCase.execute({ email: "nobody@example.com", password: PASSWORD });
 
@@ -211,7 +277,7 @@ describe("AuthenticateWithPassword", () => {
       // is the only time the plaintext exists. Without this, raising cost
       // parameters would mean a mass password reset.
       const stronger = new Argon2PasswordHasher({ ...FAST, memoryCost: 512 });
-      const useCase = new AuthenticateWithPassword(unitOfWork, stronger);
+      const useCase = new AuthenticateWithPassword(unitOfWork, stronger, new NoopRateLimiter());
 
       const existing = await loadUser(unitOfWork);
       const before = await unitOfWork.repositories.credentials.findByUserId(existing.id);
@@ -219,6 +285,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(true);
 
       const after = await unitOfWork.repositories.credentials.findByUserId(result.value.user.id);
@@ -234,6 +301,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(false);
     });
 
@@ -249,14 +317,20 @@ describe("AuthenticateWithPassword", () => {
           findByUserId: (userId) => unitOfWork.repositories.credentials.findByUserId(userId),
           save: () => Promise.reject(new Error("database is on fire")),
           deleteByUserId: (userId) => unitOfWork.repositories.credentials.deleteByUserId(userId),
+          // Delegated rather than stubbed: this fake exists to make `save`
+          // fail, and every other method should behave normally so the test
+          // isolates that one failure.
+          getStaleCredentialMetrics: (hasher) =>
+            unitOfWork.repositories.credentials.getStaleCredentialMetrics(hasher),
         },
       });
-      const useCase = new AuthenticateWithPassword(failing, stronger);
+      const useCase = new AuthenticateWithPassword(failing, stronger, new NoopRateLimiter());
 
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(false);
     });
   });

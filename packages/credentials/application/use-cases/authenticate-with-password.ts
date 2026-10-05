@@ -1,5 +1,7 @@
 import { Email, type User, type UserStatus } from "@verixa/identity";
+import type { MfaEnforcementLevel } from "@verixa/mfa";
 import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
+import type { RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
 
 import type { Credential } from "../../domain/entities/credential.js";
 import {
@@ -14,6 +16,22 @@ export interface AuthenticateWithPasswordCommand {
   readonly password: string;
 }
 
+export type MfaChallengeResult = {
+  readonly status: "mfa_challenge";
+  readonly userId: string;
+  readonly methods: readonly { readonly id: string; readonly type: string }[];
+};
+
+export type EnrollmentRequiredResult = {
+  readonly status: "enrollment_required";
+  readonly userId: string;
+};
+
+export type AuthenticateWithPasswordSuccessResult =
+  | { readonly user: User; readonly rehashed: boolean; readonly status?: undefined }
+  | MfaChallengeResult
+  | EnrollmentRequiredResult;
+
 export interface AuthenticateWithPasswordResult {
   readonly user: User;
   /** True when the stored hash was upgraded during this login. Diagnostic only. */
@@ -21,6 +39,11 @@ export interface AuthenticateWithPasswordResult {
 }
 
 export type AuthenticateWithPasswordError = AuthenticationError | AccountLockedError;
+
+export interface MfaChecker {
+  resolvePolicy(userId: string): Promise<MfaEnforcementLevel>;
+  listActiveMethods(userId: string): Promise<readonly { readonly id: string; readonly type: string }[]>;
+}
 
 /**
  * Decoy hashes, one per hasher, used to burn time when there is no real
@@ -133,12 +156,28 @@ export class AuthenticateWithPassword {
   constructor(
     private readonly unitOfWork: CredentialsUnitOfWork,
     private readonly passwordHasher: PasswordHasher,
+    private readonly rateLimiter: RateLimiter,
     private readonly lockoutPolicy: LockoutPolicy = DEFAULT_LOCKOUT_POLICY,
+    private readonly mfaChecker?: MfaChecker,
   ) {}
 
   async execute(
     command: AuthenticateWithPasswordCommand,
-  ): Promise<Result<AuthenticateWithPasswordResult, AuthenticateWithPasswordError>> {
+  ): Promise<Result<AuthenticateWithPasswordSuccessResult, AuthenticateWithPasswordError>> {
+    // 1. Check rate limit BEFORE any other logic
+    const rateLimitKey: RateLimitKey = {
+      action: "login",
+      identifier: command.email,
+    };
+
+    const limitResult = await this.rateLimiter.check(rateLimitKey);
+    if (!limitResult.allowed) {
+      throw new Error(
+        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
+          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
+      );
+    }
+
     // A malformed address is not a validation error here, unlike everywhere
     // else in the codebase. `Email.create` rejecting "not-an-email" is a
     // perfectly good 400 during registration; on a login endpoint it tells an
@@ -202,6 +241,8 @@ export class AuthenticateWithPassword {
         await repositories.credentials.save(
           credential.recordFailedAttempt(this.lockoutPolicy, now),
         );
+        // Record failed login attempt for rate limiting
+        await this.rateLimiter.recordFailure(rateLimitKey);
         return { kind: "failed" };
       }
 
@@ -254,6 +295,9 @@ export class AuthenticateWithPassword {
     }
     const verified = { user: outcome.user, credential: outcome.credential };
 
+    // Reset rate limit counter on successful authentication
+    await this.rateLimiter.reset(rateLimitKey);
+
     // Deliberately outside the transaction above.
     //
     // Re-hashing is the slowest thing this use case does and needs no
@@ -269,6 +313,39 @@ export class AuthenticateWithPassword {
     // commit, where nothing is left to catch it. Out here, a failed upgrade
     // is genuinely inert.
     const rehashed = await this.upgradeHashIfStale(verified.credential, command.password);
+
+    if (this.mfaChecker !== undefined) {
+      const policy = await this.mfaChecker.resolvePolicy(verified.user.id);
+      const activeMethods = await this.mfaChecker.listActiveMethods(verified.user.id);
+
+      if (policy === "required" && activeMethods.length === 0) {
+        return Result.ok({
+          user: verified.user,
+          rehashed,
+          status: "enrollment_required",
+          userId: verified.user.id,
+        });
+      }
+
+      if (policy === "required" || (policy === "optional" && activeMethods.length > 0) || activeMethods.length > 0) {
+        if (activeMethods.length > 0) {
+          return Result.ok({
+            user: verified.user,
+            rehashed,
+            status: "mfa_challenge",
+            userId: verified.user.id,
+            methods: activeMethods,
+          });
+        } else if (policy === "required") {
+          return Result.ok({
+            user: verified.user,
+            rehashed,
+            status: "enrollment_required",
+            userId: verified.user.id,
+          });
+        }
+      }
+    }
 
     return Result.ok({ user: verified.user, rehashed });
   }

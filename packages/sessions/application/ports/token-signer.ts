@@ -86,31 +86,6 @@ export interface IssuedAccessToken {
 }
 
 /**
- * Mints and verifies stateless access tokens.
- *
- * "Stateless" is the whole point: {@link verify} answers "is this a genuine,
- * unexpired token this system issued?" from the token and the verifier's keys
- * alone, with no store lookup. That is what makes access-token verification
- * cheap enough to run on every request in every service. The price is that a
- * token stays valid until it expires even if the session behind it should die
- * sooner — which is exactly the gap the revocation deny-list (Issue 088) and
- * short token lifetimes close, not this port.
- *
- * Verification errors come back as a {@link Result}, not a thrown exception:
- * an invalid or expired token is an ordinary, expected outcome on an auth
- * boundary (every unauthenticated request produces one), not an exceptional
- * condition. See `docs/guides/use-cases.md` on Result-vs-throw.
- */
-export interface TokenSigner {
-  /** Signs `input` into a compact JWS string using the current signing key. */
-  sign(input: AccessTokenInput): Promise<string>;
-
-  /**
-   * Verifies and decodes `token`. Returns the decoded claims on success, or a
-   * {@link TokenVerificationError} explaining the rejection (unknown key,
-   * bad signature, expiry, malformed input).
-   */
-  verify(token: string): Promise<Result<VerifiedAccessToken, TokenVerificationError>>;
  * Signs access tokens on behalf of a user.
  *
  * Kept to exactly the one operation these use cases need. Verifying a

@@ -1,5 +1,7 @@
-import { Result, ValidationError } from "@verixa/shared-kernel";
 import crypto from "node:crypto";
+
+import { Result, ValidationError } from "@verixa/shared-kernel";
+
 import { base32 } from "../services/base32.js";
 
 export class TotpSecret {
@@ -50,4 +52,3 @@ export class TotpSecret {
     return "TotpSecret { <redacted> }";
   }
 }
-export interface TotpSecret { readonly value: string; readonly provisioningUri: string; }

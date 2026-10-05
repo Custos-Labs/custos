@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["index.ts", "domain/**/*", "application/**/*", "infrastructure/**/*"]
+  "include": [
+    "index.ts",
+    "domain/**/*",
+    "application/**/*",
+    "infrastructure/**/*",
+    "interface/**/*"
+  ]
+}

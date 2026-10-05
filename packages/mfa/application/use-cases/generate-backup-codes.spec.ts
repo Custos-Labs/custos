@@ -1,19 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
 import { Result } from "@verixa/shared-kernel";
-import { GenerateBackupCodes } from "./generate-backup-codes.js";
+import { describe, expect, it, vi } from "vitest";
+
+import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
 import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
-import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
+
+import { GenerateBackupCodes } from "./generate-backup-codes.js";
 
 describe("GenerateBackupCodes", () => {
   it("generates new backup codes, persists them, and deletes old ones", async () => {
     const repo = new InMemoryMfaMethodRepository();
+    const record = vi.fn().mockResolvedValue(undefined);
     const auditLogger: AuditLogger = {
-      record: vi.fn().mockResolvedValue(undefined),
+      record,
     };
 
     const userId = "user-123" as UserId;
-    
+
     // Create an existing backup_codes method
     const oldMethod = MfaMethod.create(userId, "backup_codes", "old-hashes");
     oldMethod.activate();
@@ -35,26 +38,24 @@ describe("GenerateBackupCodes", () => {
     expect(generation.hashedCodes).toHaveLength(10);
 
     const allMethods = await repo.findAll();
-    
+
     // The old backup_codes method should be gone
-    expect(allMethods.find(m => m.id === oldMethod.id)).toBeUndefined();
-    
+    expect(allMethods.find((m) => m.id === oldMethod.id)).toBeUndefined();
+
     // The totp method should still be there
-    expect(allMethods.find(m => m.id === totpMethod.id)).toBeDefined();
+    expect(allMethods.find((m) => m.id === totpMethod.id)).toBeDefined();
 
     // A new backup_codes method should be created
-    const newBackupCodes = allMethods.filter(m => m.type === "backup_codes");
+    const newBackupCodes = allMethods.filter((m) => m.type === "backup_codes");
     expect(newBackupCodes).toHaveLength(1);
-    
+
     const newMethod = newBackupCodes[0];
     expect(newMethod?.userId).toBe(userId);
     expect(newMethod?.status).toBe("active");
     expect(newMethod?.secret).toBe(JSON.stringify(generation.hashedCodes));
 
-    expect(auditLogger.record).toHaveBeenCalledWith(
-      "backup_codes.generated",
-      userId,
-      { count: "10" }
-    );
+    expect(record).toHaveBeenCalledWith("backup_codes.generated", userId, {
+      count: "10",
+    });
   });
 });

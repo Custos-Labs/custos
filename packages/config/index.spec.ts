@@ -27,6 +27,8 @@ describe("loadConfig", () => {
       REDIS_URL: "redis://redis.example.com:6379",
       SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
       SESSION_MAX_CONCURRENT_SESSIONS: 0,
+      MFA_ENFORCEMENT_LEVEL: "optional",
+      MFA_ALLOWED_METHODS: [],
     });
   });
 
@@ -54,6 +56,8 @@ describe("loadConfig", () => {
       REDIS_URL: "redis://localhost:6379",
       SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
       SESSION_MAX_CONCURRENT_SESSIONS: 0,
+      MFA_ENFORCEMENT_LEVEL: "optional",
+      MFA_ALLOWED_METHODS: [],
     });
   });
 

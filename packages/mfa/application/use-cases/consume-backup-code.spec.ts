@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
-import { ConsumeBackupCode } from "./consume-backup-code.js";
-import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
-import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
-import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
 import { Result } from "@verixa/shared-kernel";
+import { describe, expect, it, vi } from "vitest";
+
+import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
+import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
+import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
+
+import { ConsumeBackupCode } from "./consume-backup-code.js";
 
 describe("ConsumeBackupCode", () => {
   it("verifies a valid code, marks it consumed, and signals remaining count", async () => {
     const repo = new InMemoryMfaMethodRepository();
-    const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
+    const record = vi.fn().mockResolvedValue(undefined);
+    const auditLogger = { record };
     const userId = "user-123" as UserId;
 
     const generation = await BackupCodeSet.generate(2);
@@ -27,17 +30,20 @@ describe("ConsumeBackupCode", () => {
     expect(result.value).toEqual({ kind: "ok", codesRemaining: 1 });
 
     const updated = await repo.findById(method.id);
-    const hashes = JSON.parse(updated!.secret!);
+    const hashes = JSON.parse(updated!.secret!) as string[];
     expect(hashes).toHaveLength(1);
     expect(hashes).not.toContain(generation.hashedCodes[0]);
     expect(hashes).toContain(generation.hashedCodes[1]);
 
-    expect(auditLogger.record).toHaveBeenCalledWith("backup_code.consumed", userId, { remaining: "1" });
+    expect(record).toHaveBeenCalledWith("backup_code.consumed", userId, {
+      remaining: "1",
+    });
   });
 
   it("rejects an invalid code", async () => {
     const repo = new InMemoryMfaMethodRepository();
-    const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
+    const record = vi.fn().mockResolvedValue(undefined);
+    const auditLogger = { record };
     const userId = "user-123" as UserId;
 
     const generation = await BackupCodeSet.generate(2);
@@ -53,12 +59,13 @@ describe("ConsumeBackupCode", () => {
     if (!Result.isOk(result)) return;
 
     expect(result.value).toEqual({ kind: "failed" });
-    expect(auditLogger.record).toHaveBeenCalledWith("backup_code.failed", userId);
+    expect(record).toHaveBeenCalledWith("backup_code.failed", userId);
   });
 
   it("rejects a previously consumed code", async () => {
     const repo = new InMemoryMfaMethodRepository();
-    const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
+    const record = vi.fn().mockResolvedValue(undefined);
+    const auditLogger = { record };
     const userId = "user-123" as UserId;
 
     const generation = await BackupCodeSet.generate(2);
@@ -83,7 +90,8 @@ describe("ConsumeBackupCode", () => {
 
   it("signals exhaustion on the last code", async () => {
     const repo = new InMemoryMfaMethodRepository();
-    const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
+    const record = vi.fn().mockResolvedValue(undefined);
+    const auditLogger = { record };
     const userId = "user-123" as UserId;
 
     const generation = await BackupCodeSet.generate(1);
@@ -104,7 +112,8 @@ describe("ConsumeBackupCode", () => {
 
   it("returns failed if the user has no backup codes active", async () => {
     const repo = new InMemoryMfaMethodRepository();
-    const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
+    const record = vi.fn().mockResolvedValue(undefined);
+    const auditLogger = { record };
     const userId = "user-123" as UserId;
 
     const useCase = new ConsumeBackupCode(repo, auditLogger);
