@@ -45,8 +45,14 @@ async function seedDefaultRoles(prisma: PrismaClient): Promise<void> {
     permissionIds.set(key, row.id);
   }
   for (const definition of DEFAULT_ROLES) {
-    const existing = await prisma.role.findFirst({
-      where: { organizationId: null, name: definition.name },
+    // Located by name alone: `Role.name` is globally unique in the schema, and
+    // there is no `organization_id` column on `roles`. The authorization
+    // domain's `Role` carries an `orgId` and `CreateRole` enforces uniqueness
+    // per organization, but no migration has ever added that column -- so this
+    // file previously filtered on `organizationId: null`, which does not
+    // compile against the generated client. See the note in the commit.
+    const existing = await prisma.role.findUnique({
+      where: { name: definition.name },
     });
     const role =
       existing === null
@@ -56,7 +62,6 @@ async function seedDefaultRoles(prisma: PrismaClient): Promise<void> {
               name: definition.name,
               description: definition.description,
               isSystemRole: true,
-              organizationId: null,
               createdAt: now,
               updatedAt: now,
             },

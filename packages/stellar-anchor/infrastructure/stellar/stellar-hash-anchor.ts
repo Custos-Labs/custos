@@ -150,6 +150,8 @@ export class StellarHashAnchor implements HashAnchor {
     const account = await this.signer.accountId();
     if (Result.isErr(account)) {
       return Result.err(new AnchorError(account.error.message, { cause: account.error }));
+    }
+
     if (this.fundingGuard !== undefined) {
       const cleared = await this.fundingGuard.beforeAnchor();
       if (Result.isErr(cleared)) {

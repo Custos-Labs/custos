@@ -8,9 +8,9 @@ import { WebAuthnChallenge } from "../../domain/entities/webauthn-challenge.js";
 import { WebAuthnCredential } from "../../domain/entities/webauthn-credential.js";
 import { WebAuthnCloneSuspected } from "../../domain/events/webauthn-clone-suspected.js";
 import { InMemoryDomainEventPublisher } from "../../infrastructure/fakes/in-memory-domain-event-publisher.js";
-import { InMemoryMfaMethodRepository } from "../../infrastructure/fakes/in-memory-mfa-method-repository.js";
 import { InMemoryWebAuthnChallengeRepository } from "../../infrastructure/fakes/in-memory-webauthn-challenge-repository.js";
 import { InMemoryWebAuthnCredentialRepository } from "../../infrastructure/fakes/in-memory-webauthn-credential-repository.js";
+import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
 import { WebAuthnAssertionVerifier } from "../../infrastructure/webauthn/assertion-verifier.js";
 import { encodeCbor } from "../../infrastructure/webauthn/cbor.js";
 
@@ -465,7 +465,7 @@ describe("VerifyWebAuthnAssertion use case", () => {
       const keyPair = generateTestEcKeyPair();
       const coseKey = Buffer.from(coseKeyFromEcPublicKey(keyPair.publicKey)).toString("base64url");
 
-      const pendingMethod = MfaMethod.createPending(rawUserId, "webauthn");
+      const pendingMethod = MfaMethod.create(rawUserId, "webauthn");
       await mfaMethodRepo.save(pendingMethod);
 
       const credential = WebAuthnCredential.create({

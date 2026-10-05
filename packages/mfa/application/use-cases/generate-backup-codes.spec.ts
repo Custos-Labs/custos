@@ -1,15 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
 import { Result } from "@verixa/shared-kernel";
-import { GenerateBackupCodes } from "./generate-backup-codes.js";
+import { describe, expect, it, vi } from "vitest";
+
+import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
 import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
-import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
+
+import { GenerateBackupCodes } from "./generate-backup-codes.js";
 
 describe("GenerateBackupCodes", () => {
   it("generates new backup codes, persists them, and deletes old ones", async () => {
     const repo = new InMemoryMfaMethodRepository();
+    const record = vi.fn().mockResolvedValue(undefined);
     const auditLogger: AuditLogger = {
-      record: vi.fn().mockResolvedValue(undefined),
+      record,
     };
 
     const userId = "user-123" as UserId;
@@ -51,7 +54,7 @@ describe("GenerateBackupCodes", () => {
     expect(newMethod?.status).toBe("active");
     expect(newMethod?.secret).toBe(JSON.stringify(generation.hashedCodes));
 
-    expect(auditLogger.record).toHaveBeenCalledWith("backup_codes.generated", userId, {
+    expect(record).toHaveBeenCalledWith("backup_codes.generated", userId, {
       count: "10",
     });
   });

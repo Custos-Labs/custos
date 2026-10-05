@@ -12,19 +12,17 @@
 // trustworthy as its least careful writer. Consumers can read entries and
 // verify a chain; they cannot build one.
 
-// Domain: the entry as a read-only type, and the chain-verification tool
-export type {
-  AuditAction,
-// Domain: AuditLogEntry (Phase 01 hash-chained audit log)
+// Domain: AuditLogEntry (Phase 01 hash-chained audit log) -- the entry as a
+// read-only type, and the chain-verification tool
 export {
   type AuditAction as AuditLogAction,
-  AuditLogEntry,
-  AuditLogEntryId,
-  ChainBreak,
+  type AuditLogEntry,
+  type AuditLogEntryId,
+  type ChainBreak,
 } from "./domain/entities/audit-log-entry.js";
 export { verifyChain } from "./domain/entities/audit-log-entry.js";
 
-// Application: ports (for the composition root to supply adapters for)
+// Domain: who may read the log, and the permissions that decide it
 export {
   AUDIT_PERMISSIONS,
   AuditAccessDeniedError,
@@ -55,6 +53,7 @@ export {
 export type { AuditMetadataRejectionReason } from "./domain/value-objects/audit-metadata.js";
 
 // Application: ports (AuditLogRepository - Phase 01)
+export { ChainConflictError } from "./application/ports/audit-log-repository.js";
 export type {
   AnchorFailure,
   AnchorReceiptLike,
@@ -102,20 +101,23 @@ export {
   MAX_AUDIT_QUERY_PAGE_SIZE,
   QueryAuditEvents,
   type QueryAuditEventsCommand,
+  type QueryAuditEventsResult,
 } from "./application/use-cases/query-audit-events.js";
 export {
   ExportAuditEvents,
   type ExportAuditEventsCommand,
 } from "./application/use-cases/export-audit-events.js";
-export { type AuditReadError, AuditReadNotRecordedError } from "./application/audit-read-access.js";
+// Encoding is its own module: the use case authorizes the disclosure and
+// yields entries, and whatever writes the response encodes them.
+export {
   AUDIT_EXPORT_HEADER,
   DEFAULT_EXPORT_MAX_RECORDS,
-  ExportAuditEvents,
+  encodeAuditExport,
   type AuditExportFormat,
   type AuditExportLogger,
-  type ExportAuditEventsCommand,
   type ExportAuditEventsResult,
-} from "./application/use-cases/export-audit-events.js";
+} from "./application/audit-export-encoding.js";
+export { type AuditReadError, AuditReadNotRecordedError } from "./application/audit-read-access.js";
 export {
   AgeRetentionPolicy,
   DEFAULT_RETENTION_POLICY,
@@ -129,19 +131,6 @@ export {
   type RetentionCandidate,
   type RetentionReview,
 } from "./application/use-cases/apply-audit-retention-policy.js";
-export {
-  QueryAuditEvents,
-  type QueryAuditEventsCommand,
-  type QueryAuditEventsFilters,
-  type QueryAuditEventsResult,
-} from "./application/use-cases/query-audit-events.js";
-export {
-  ExportAuditEvents,
-  escapeCsvField,
-  type ExportAuditEventsCommand,
-  type ExportAuditEventsError,
-  type ExportAuditEventsFormat,
-} from "./application/use-cases/export-audit-events.js";
 export {
   DEFAULT_MAX_ANCHOR_CHECKS,
   DEFAULT_VERIFY_BATCH_SIZE,
@@ -184,7 +173,6 @@ export {
 } from "./infrastructure/persistence/batched-audit-writer.js";
 export {
   type AuditDelegate,
-  AuditLogEntryMapper,
   type AuditTransaction,
   PrismaAnchorRecordRepository,
   PrismaAuditLogRepository,

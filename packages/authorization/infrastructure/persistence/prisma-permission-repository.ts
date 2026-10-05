@@ -2,7 +2,7 @@ import type { PrismaClient } from "@verixa/database";
 import { Result } from "@verixa/shared-kernel";
 import type { PermissionRepository } from "../../application/ports/permission-repository.js";
 import { Permission } from "../../domain/value-objects/permission.js";
-import { mapPrismaError } from "@verixa/identity/infrastructure/persistence/error-mapper.js";
+import { mapPrismaError } from "./error-mapper.js";
 
 export class PrismaPermissionRepository implements PermissionRepository {
   constructor(private readonly prisma: PrismaClient) {}

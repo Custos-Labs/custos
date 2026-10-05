@@ -4,7 +4,7 @@ import { ConflictError, Result, ValidationError, asId } from "@verixa/shared-ker
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import { WebAuthnChallenge } from "../../domain/entities/webauthn-challenge.js";
-import { WebAuthnCredential } from "../../domain/entities/webauthn-credential.js";
+import { WebAuthnCredential, type AuthenticatorTransport } from "../../domain/entities/webauthn-credential.js";
 import type { AttestationVerifier } from "../ports/attestation-verifier.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { WebAuthnChallengeRepository } from "../ports/webauthn-challenge-repository.js";
@@ -30,7 +30,15 @@ export interface RegisterWebAuthnCredentialCommand {
   readonly challenge: string;
   readonly clientDataJSON: string | Uint8Array;
   readonly attestationObject: string | Uint8Array;
-  readonly transports?: readonly string[] | undefined;
+  /**
+   * The transports the authenticator reported, from the registration response.
+   *
+   * Typed as the spec's union rather than `string[]` so a value that no client
+   * would ever offer cannot be stored: these are persisted and later handed
+   * back to the browser, and a typo here would surface as an authenticator the
+   * user cannot use rather than as an error at the boundary.
+   */
+  readonly transports?: readonly AuthenticatorTransport[] | undefined;
   readonly deviceName?: string | undefined;
 }
 

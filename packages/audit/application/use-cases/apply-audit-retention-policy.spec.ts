@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
+import { AuditLogEntry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
 import { InMemoryAuditLogRepository } from "../../infrastructure/testing/in-memory-audit-repositories.js";
 import { AgeRetentionPolicy, DEFAULT_RETENTION_POLICY } from "../ports/retention-policy.js";
 
@@ -33,7 +33,7 @@ async function seed(
       occurredAt: new Date(NOW.getTime() - daysAgo * DAY),
       previous,
     });
-    await repository.append(entry);
+    await repository.append(entry, previous?.hash ?? GENESIS_HASH);
     previous = entry;
   }
 }

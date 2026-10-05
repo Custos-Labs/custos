@@ -1,10 +1,11 @@
 import { asId, Result } from "@verixa/shared-kernel";
 
-import { StepUpAssertion } from "../../domain/value-objects/step-up-assertion.js";
 import type { MfaMethodType } from "../../domain/entities/mfa-method.js";
+import { StepUpAssertion } from "../../domain/value-objects/step-up-assertion.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { StepUpAssertionStore } from "../ports/step-up-assertion-store.js";
+
 import type { ConsumeBackupCode } from "./consume-backup-code.js";
 import type { VerifyTotpChallenge } from "./verify-totp-challenge.js";
 

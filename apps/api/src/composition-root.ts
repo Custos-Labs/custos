@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 
 import {
   AnchorAuditLog,
+  BatchedAuditWriter,
   PrismaAnchorRecordRepository,
   PrismaAuditLogRepository,
-  QueryAuditEvents,
   RecordAuditEvent,
   VerifyAuditChain,
+  type AuditDelegate,
+  type AuditTransaction,
 } from "@verixa/audit";
 import { PrismaAuthorizationRepository, type AuthorizationRepository } from "@verixa/authorization";
 import { loadConfig } from "@verixa/config";
@@ -34,13 +36,6 @@ import {
   SuspendUser,
   UpdateUserProfile,
 } from "@verixa/identity";
-import { NoopRateLimiter } from "@verixa/shared-kernel";
-import {
-  LocalTransactionSigner,
-  StellarHashAnchor,
-  type StellarNetwork,
-  type TransactionSigner,
-} from "@verixa/stellar-anchor";
 import {
   InMemoryDomainEventPublisher,
   InMemoryMfaMethodRepository,
@@ -56,7 +51,12 @@ import {
   NoopRateLimiter,
   type DomainEventPublisher,
 } from "@verixa/shared-kernel";
-import { StellarHashAnchor } from "@verixa/stellar-anchor";
+import {
+  LocalTransactionSigner,
+  StellarHashAnchor,
+  type StellarNetwork,
+  type TransactionSigner,
+} from "@verixa/stellar-anchor";
 
 import { registerAuditSubscribers } from "./composition/register-audit-subscribers.js";
 
@@ -218,7 +218,6 @@ export interface CredentialUseCases {
 /** Audit recording, query, integrity verification and its external anchoring. */
 export interface AuditUseCases {
   readonly recordEvent: RecordAuditEvent;
-  readonly queryEvents: QueryAuditEvents;
   /**
    * Re-derives the hash chain and reports the first divergence.
    *
@@ -330,6 +329,33 @@ export function buildContainer(
   const auditLog = new PrismaAuditLogRepository(prisma.auditLogEntry, auditTransaction(prisma));
   const anchorRecords = new PrismaAnchorRecordRepository(prisma.anchorRecord, () => randomUUID());
 
+  // Batched writes are opt-in (Issue #134). The default keeps the per-event
+  // writer, whose behaviour — an entry is durable before the request returns —
+  // is the one an operator who has not read the throughput document will
+  // assume. Turning batching on trades that for throughput, so it is a
+  // deployment decision and stated as an environment variable, not a code
+  // change at every call site.
+  const batched = process.env["AUDIT_BATCHED_WRITES"] === "1";
+  const batchedWriter = batched
+    ? new BatchedAuditWriter(auditLog, {
+        maxBatchSize: positiveIntFromEnv("AUDIT_MAX_BATCH_SIZE", 100),
+        flushIntervalMs: positiveIntFromEnv("AUDIT_FLUSH_INTERVAL_MS", 250),
+        maxQueueSize: positiveIntFromEnv("AUDIT_MAX_QUEUE_SIZE", 10_000),
+        onOverflow: (report) => {
+          // The overflow *metric*. Refusing to write is correct behaviour, but
+          // it is only defensible if somebody can see it happening.
+          process.stderr.write(
+            `audit queue full: refused "${report.dropped.action}" (${String(report.queueLength)}/${String(report.queueLimit)} pending, ${String(report.overflowedTotal)} refused total)\n`,
+          );
+        },
+        onBatchFailure: (report) => {
+          process.stderr.write(
+            `audit batch lost: ${String(report.commands.length)} entries dropped after ${String(report.attempts)} attempts\n`,
+          );
+        },
+      }).start()
+    : undefined;
+
   const recordAuditEvent = new RecordAuditEvent(auditLog, (error: unknown) => {
     // Written to stderr rather than swallowed entirely: a gap in the audit
     // log is itself a security-relevant event, and the sequence gap it
@@ -439,7 +465,6 @@ export function buildContainer(
     },
     audit: {
       recordEvent: recordAuditEvent,
-      queryEvents: new QueryAuditEvents(auditLog),
       // Verification is given the same ledger the anchor use case uses, so a
       // deployment that anchors gets the independent ledger check for free and
       // one that does not still gets the local re-derivation. `undefined` is

@@ -16,7 +16,7 @@ import { MfaMethod, type UserId } from "../../../domain/entities/mfa-method.js";
  */
 export function mfaMethodRepositoryContract(
   createRepository: () => MfaMethodRepository,
-  setupUser: () => Promise<UserId> = async () => createId<"UserId">(),
+  setupUser: () => Promise<UserId> = () => Promise.resolve(createId<"UserId">()),
 ): void {
   describe("MfaMethodRepository contract", () => {
     it("returns undefined for a method that was never saved", async () => {

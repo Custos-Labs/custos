@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
-import { StepUpAssertion } from "../../domain/value-objects/step-up-assertion.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
+import { StepUpAssertion } from "../../domain/value-objects/step-up-assertion.js";
 import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
 import type { StepUpAssertionStore } from "../ports/step-up-assertion-store.js";
+
 import { ConsumeBackupCode } from "./consume-backup-code.js";
 import { StepUpAuthentication } from "./step-up-authentication.js";
 import { VerifyTotpChallenge } from "./verify-totp-challenge.js";
@@ -14,18 +15,19 @@ import { VerifyTotpChallenge } from "./verify-totp-challenge.js";
 class InMemoryStepUpAssertionStore implements StepUpAssertionStore {
   private latest = new Map<string, StepUpAssertion>();
 
-  async record(assertion: StepUpAssertion): Promise<void> {
+  record(assertion: StepUpAssertion): Promise<void> {
     this.latest.set(assertion.userId, assertion);
+    return Promise.resolve();
   }
 
-  async findLatest(userId: string): Promise<StepUpAssertion | undefined> {
-    return this.latest.get(userId);
+  findLatest(userId: string): Promise<StepUpAssertion | undefined> {
+    return Promise.resolve(this.latest.get(userId));
   }
 }
 
 const fakeTotpAlgorithm: TotpAlgorithm = {
-  generateSecret: async () => ({ value: "SECRET", provisioningUri: "uri" }),
-  verify: async (_secret, code) => (code === "123456" ? 1000 : null),
+  generateSecret: () => Promise.resolve({ value: "SECRET", provisioningUri: "uri" }),
+  verify: (_secret, code) => Promise.resolve(code === "123456" ? 1000 : null),
 };
 
 function setup() {

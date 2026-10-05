@@ -1,7 +1,7 @@
 import { Result, ValidationError } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
-import { AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
+import { AuditLogEntry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
 import { InMemoryAuditLogRepository } from "../../infrastructure/testing/in-memory-audit-repositories.js";
 import type {
   AnchorFailure,
@@ -36,8 +36,9 @@ async function seedChain(
   let previous: AuditLogEntry | undefined;
 
   for (let index = 0; index < length; index += 1) {
+    const expected = previous?.hash ?? GENESIS_HASH;
     previous = appendAfter(previous, metadata);
-    await repository.append(previous);
+    await repository.append(previous, expected);
     entries.push(previous);
   }
 
@@ -272,8 +273,9 @@ describe("VerifyAuditChain", () => {
       let previous: AuditLogEntry | undefined;
 
       for (const organizationId of owners) {
+        const expected = previous?.hash ?? GENESIS_HASH;
         previous = appendAfter(previous, organizationId === undefined ? {} : { organizationId });
-        await repository.append(previous);
+        await repository.append(previous, expected);
         entries.push(previous);
       }
 

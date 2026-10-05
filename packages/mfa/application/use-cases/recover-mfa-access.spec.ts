@@ -6,17 +6,23 @@ import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-mem
 import type { AuditLogger } from "../ports/audit-logger.js";
 import type { MfaRecoveryAuthorizer } from "../ports/mfa-recovery-authorizer.js";
 import type { SessionRevoker } from "../ports/session-revoker.js";
+
 import { RecoverMfaAccess } from "./recover-mfa-access.js";
 
 function setup(options: { authorized?: boolean; sessionsRevoked?: number } = {}) {
   const repository = new InMemoryMfaMethodRepository();
-  const auditLogger: AuditLogger = { record: vi.fn().mockResolvedValue(undefined) };
-  const authorizer: MfaRecoveryAuthorizer = {
-    canRecoverMfaAccess: vi.fn().mockResolvedValue(options.authorized ?? true),
-  };
-  const sessionRevoker: SessionRevoker = {
-    revokeAllForUser: vi.fn().mockResolvedValue(options.sessionsRevoked ?? 3),
-  };
+
+  // The spies are held in locals and asserted on directly, rather than reached
+  // through `auditLogger.record`: reading a method off the object detaches it
+  // from its receiver, which the `unbound-method` rule flags because it is a
+  // real hazard anywhere the function is later called.
+  const record = vi.fn().mockResolvedValue(undefined);
+  const canRecoverMfaAccess = vi.fn().mockResolvedValue(options.authorized ?? true);
+  const revokeAllForUser = vi.fn().mockResolvedValue(options.sessionsRevoked ?? 3);
+
+  const auditLogger: AuditLogger = { record };
+  const authorizer: MfaRecoveryAuthorizer = { canRecoverMfaAccess };
+  const sessionRevoker: SessionRevoker = { revokeAllForUser };
 
   const useCase = new RecoverMfaAccess({
     mfaMethodRepository: repository,
@@ -25,7 +31,7 @@ function setup(options: { authorized?: boolean; sessionsRevoked?: number } = {})
     auditLogger,
   });
 
-  return { repository, auditLogger, authorizer, sessionRevoker, useCase };
+  return { repository, useCase, record, canRecoverMfaAccess, revokeAllForUser };
 }
 
 async function seedMethods(
@@ -39,7 +45,7 @@ async function seedMethods(
 
 describe("RecoverMfaAccess", () => {
   it("clears every method, revokes all sessions, and audit-logs the actor", async () => {
-    const { repository, useCase, auditLogger, sessionRevoker } = setup({ sessionsRevoked: 4 });
+    const { repository, useCase, record, revokeAllForUser } = setup({ sessionsRevoked: 4 });
     const target = createId<"UserId">();
     const actor = createId<"UserId">();
     await seedMethods(repository, target);
@@ -55,8 +61,8 @@ describe("RecoverMfaAccess", () => {
     expect(result.value).toEqual({ methodsCleared: 3, sessionsRevoked: 4 });
 
     await expect(repository.findAllByUserId(target)).resolves.toHaveLength(0);
-    expect(sessionRevoker.revokeAllForUser).toHaveBeenCalledWith(target);
-    expect(auditLogger.record).toHaveBeenCalledWith(
+    expect(revokeAllForUser).toHaveBeenCalledWith(target);
+    expect(record).toHaveBeenCalledWith(
       "mfa.recovery.performed",
       actor,
       expect.objectContaining({ targetUserId: target, sessionsRevoked: "4", methodsCleared: "3" }),
@@ -64,7 +70,7 @@ describe("RecoverMfaAccess", () => {
   });
 
   it("rejects an unauthorized actor and changes nothing", async () => {
-    const { repository, useCase, sessionRevoker } = setup({ authorized: false });
+    const { repository, useCase, revokeAllForUser } = setup({ authorized: false });
     const target = createId<"UserId">();
     await seedMethods(repository, target);
 
@@ -76,11 +82,11 @@ describe("RecoverMfaAccess", () => {
 
     expect(Result.isErr(result)).toBe(true);
     await expect(repository.findAllByUserId(target)).resolves.toHaveLength(3);
-    expect(sessionRevoker.revokeAllForUser).not.toHaveBeenCalled();
+    expect(revokeAllForUser).not.toHaveBeenCalled();
   });
 
   it("cannot be self-triggered by the target user", async () => {
-    const { repository, useCase, sessionRevoker } = setup();
+    const { repository, useCase, revokeAllForUser } = setup();
     const target = createId<"UserId">();
     await seedMethods(repository, target);
 
@@ -91,7 +97,7 @@ describe("RecoverMfaAccess", () => {
     });
 
     expect(Result.isErr(result)).toBe(true);
-    expect(sessionRevoker.revokeAllForUser).not.toHaveBeenCalled();
+    expect(revokeAllForUser).not.toHaveBeenCalled();
   });
 
   it("clears disabled methods too, leaving nothing to re-use", async () => {

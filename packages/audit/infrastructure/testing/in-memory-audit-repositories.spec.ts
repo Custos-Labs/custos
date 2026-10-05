@@ -1,6 +1,7 @@
+import { Result } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
-import { AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
+import { AuditLogEntry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
 
 import {
   InMemoryAnchorRecordRepository,
@@ -26,7 +27,7 @@ async function seeded(): Promise<InMemoryAuditLogRepository> {
   let previous: AuditLogEntry | undefined;
   for (let index = 0; index < 4; index += 1) {
     const next = entry(previous, index === 1 ? "user.login_failed" : "user.registered");
-    await repository.append(next);
+    await repository.append(next, previous?.hash ?? GENESIS_HASH);
     previous = next;
   }
   return repository;
@@ -43,7 +44,9 @@ describe("InMemoryAuditLogRepository", () => {
     // production would reject.
     const fork = entry(third);
 
-    await expect(repository.append(fork)).rejects.toThrow("sequence 4 already exists");
+    const refused = await repository.append(fork, third.hash);
+
+    expect(Result.isErr(refused)).toBe(true);
     expect(await repository.count()).toBe(4);
   });
 

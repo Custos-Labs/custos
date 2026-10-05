@@ -1,18 +1,21 @@
 import {
   type AuditDelegate,
   type AuditLogEntry,
-  AuditLogEntryMapper,
   type AuditLogRepository,
   type AuditTransaction,
   BatchedAuditWriter,
   ChainConflictError,
-  GENESIS_HASH,
   InMemoryAuditLogRepository,
   PrismaAuditLogRepository,
   RecordAuditEvent,
   type RecordAuditEventCommand,
   verifyChain,
 } from "@verixa/audit";
+// The testing entry point: this benchmark writes through the chain's own
+// primitives to measure append throughput, which the main surface deliberately
+// withholds so nothing that ships can mint an entry -- see
+// `packages/audit/testing.ts`.
+import { AuditLogEntryMapper, GENESIS_HASH } from "@verixa/audit/testing";
 import { Result } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
@@ -105,6 +108,13 @@ class InstrumentedAuditRepository implements AuditLogRepository {
   async findLatest(): Promise<AuditLogEntry | undefined> {
     await this.step("findLatest");
     return this.inner.findLatest();
+  }
+
+  async findWithFilters(
+    params: Parameters<AuditLogRepository["findWithFilters"]>[0],
+  ): Promise<readonly AuditLogEntry[]> {
+    await this.step("findWithFilters");
+    return this.inner.findWithFilters(params);
   }
 
   async append(
