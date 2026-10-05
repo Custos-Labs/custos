@@ -25,7 +25,7 @@ function cloneValue(value: AttributeValue): AttributeValue {
     return Object.freeze((value as readonly AttributeValue[]).map((item) => cloneValue(item)));
   }
   if (typeof value === "object") return cloneBag(value as AttributeRecord) as AttributeRecord;
-  if (Array.isArray(value))
+  if (Array.isArray(value)) {
     return Object.freeze((value as readonly AttributeValue[]).map((item) => cloneValue(item)));
   }
   if (typeof value === "object") return cloneBag(value as AttributeRecord) as AttributeRecord;

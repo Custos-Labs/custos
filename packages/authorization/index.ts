@@ -188,6 +188,7 @@ export type {
   PolicySimulateIo,
   PolicySimulateOptions,
 } from "./infrastructure/cli/policy-simulate-command.js";
+export type {
   AttributeProviderFailure,
   AttributeResolutionResult,
 } from "./application/services/attribute-resolution-pipeline.js";
