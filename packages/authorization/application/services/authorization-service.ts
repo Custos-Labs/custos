@@ -1,14 +1,14 @@
 import {
+  emptyAttributeContext,
+  type AuthorizationRequest,
+} from "../../domain/attribute-context.js";
+import {
   AUTHORIZATION_REASONS,
   resolveAuthorizationPrecedence,
   type AuthorizationDecision,
   type AuthorizationDecisionSource,
   type AuthorizationPrecedence,
 } from "../../domain/authorization-decision.js";
-import {
-  emptyAttributeContext,
-  type AuthorizationRequest,
-} from "../../domain/attribute-context.js";
 import type { PolicyDecisionPoint } from "../ports/policy-decision-point.js";
 import type { RoleDecision, RolePermissionGate } from "../ports/role-permission-gate.js";
 

@@ -23,33 +23,35 @@ const ENTRY: CachedPolicy<{ marker: string }> = {
 class UnavailablePolicyCache implements PolicyCache {
   readonly operations: string[] = [];
 
-  async get<TValue>(_key: PolicyCacheKey): Promise<CachedPolicy<TValue> | undefined> {
+  get<TValue>(): Promise<CachedPolicy<TValue> | undefined> {
     this.operations.push("get");
-    throw new Error("redis is unreachable");
+    return Promise.reject(new Error("redis is unreachable"));
   }
 
-  async set<TValue>(
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  set<TValue>(
     _key: PolicyCacheKey,
     _entry: CachedPolicy<TValue>,
     _options?: PolicyCacheSetOptions,
   ): Promise<void> {
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     this.operations.push("set");
-    throw new Error("redis is unreachable");
+    return Promise.reject(new Error("redis is unreachable"));
   }
 
-  async invalidate(_key: PolicyCacheKey): Promise<void> {
+  invalidate(): Promise<void> {
     this.operations.push("invalidate");
-    throw new Error("redis is unreachable");
+    return Promise.reject(new Error("redis is unreachable"));
   }
 
-  async invalidateResourceType(_resourceType: string): Promise<void> {
+  invalidateResourceType(): Promise<void> {
     this.operations.push("invalidateResourceType");
-    throw new Error("redis is unreachable");
+    return Promise.reject(new Error("redis is unreachable"));
   }
 
-  async invalidateAll(): Promise<void> {
+  invalidateAll(): Promise<void> {
     this.operations.push("invalidateAll");
-    throw new Error("redis is unreachable");
+    return Promise.reject(new Error("redis is unreachable"));
   }
 }
 
@@ -57,27 +59,31 @@ class UnavailablePolicyCache implements PolicyCache {
 class WorkingPolicyCache implements PolicyCache {
   private stored: { value: unknown; policyVersion: string; cachedAt: string } | undefined;
 
-  async get<TValue>(_key: PolicyCacheKey): Promise<CachedPolicy<TValue> | undefined> {
+  get<TValue>(): Promise<CachedPolicy<TValue> | undefined> {
     if (this.stored === undefined) {
-      return undefined;
+      return Promise.resolve(undefined);
     }
-    return { ...this.stored, value: this.stored.value as TValue };
+    return Promise.resolve({ ...this.stored, value: this.stored.value as TValue });
   }
 
-  async set<TValue>(_key: PolicyCacheKey, entry: CachedPolicy<TValue>): Promise<void> {
+  set<TValue>(_key: PolicyCacheKey, entry: CachedPolicy<TValue>): Promise<void> {
     this.stored = entry;
+    return Promise.resolve();
   }
 
-  async invalidate(_key: PolicyCacheKey): Promise<void> {
+  invalidate(): Promise<void> {
     this.stored = undefined;
+    return Promise.resolve();
   }
 
-  async invalidateResourceType(_resourceType: string): Promise<void> {
+  invalidateResourceType(): Promise<void> {
     this.stored = undefined;
+    return Promise.resolve();
   }
 
-  async invalidateAll(): Promise<void> {
+  invalidateAll(): Promise<void> {
     this.stored = undefined;
+    return Promise.resolve();
   }
 }
 

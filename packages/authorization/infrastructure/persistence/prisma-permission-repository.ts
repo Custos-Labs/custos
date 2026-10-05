@@ -34,7 +34,7 @@ export class PrismaPermissionRepository implements PermissionRepository {
         update: {},
       });
     } catch (error) {
-      throw mapPrismaError(error, "Permission");
+      return mapPrismaError(error, "Permission");
     }
   }
 
@@ -46,7 +46,7 @@ export class PrismaPermissionRepository implements PermissionRepository {
       const parsed = Permission.create(row.key);
       return Result.isOk(parsed) ? parsed.value : undefined;
     } catch (error) {
-      throw mapPrismaError(error, "Permission");
+      return mapPrismaError(error, "Permission");
     }
   }
 
@@ -69,7 +69,7 @@ export class PrismaPermissionRepository implements PermissionRepository {
       }
       return permissions;
     } catch (error) {
-      throw mapPrismaError(error, "Permission");
+      return mapPrismaError(error, "Permission");
     }
   }
 }

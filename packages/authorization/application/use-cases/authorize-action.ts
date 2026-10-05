@@ -1,16 +1,24 @@
+import type { AuthorizationDecision as DomainAuthorizationDecision } from "../../domain/authorization-decision.js";
+import type { PolicyId } from "../../domain/entities/policy.js";
 import {
   AttributeContext,
   type AttributeBag,
 } from "../../domain/value-objects/attribute-context.js";
 import type { AuthorizationDecision } from "../dto/authorization-decision.js";
-import type {
-  AuthorizationResult,
-  AuthorizationService,
-} from "../services/authorization-service.js";
+import type { AuthorizationService } from "../services/authorization-service.js";
 import type { ResourceAttributeResolverRegistry } from "../services/resource-attribute-resolver-registry.js";
 
 export interface AuthorizeActionCommand {
   readonly subjectId: string;
+  /**
+   * The organization the check is being made within.
+   *
+   * Required because `SubjectRef` is tenant-scoped: the same subject may hold
+   * different roles in different organizations, so a decision rendered without
+   * a tenant is not answerable. An earlier version of this command omitted it
+   * and passed flat primitives to a port that has since become tenant-aware.
+   */
+  readonly tenantId: string;
   readonly action: string;
   readonly resourceType: string;
   readonly resourceId: string;
@@ -83,34 +91,69 @@ export class AuthorizeAction {
     });
 
     const result = await this.authorizationService.authorize({
-      subjectId: command.subjectId,
+      subject: { subjectId: command.subjectId, tenantId: command.tenantId },
       action: command.action,
-      resourceType: command.resourceType,
-      context,
+      resource: { resourceType: command.resourceType, resourceId: command.resourceId },
+      context: context.toBags(),
     });
 
     return {
       granted: result.effect === "PERMIT",
       reason: AuthorizeAction.describeReason(result),
-      matchedPolicyIds: result.matchedPolicyIds,
+      // The service reports ids as plain strings; the DTO brands them. They are
+      // the ids of policies the evaluator matched, so the brand holds.
+      matchedPolicyIds: result.matchedPolicyIds as readonly PolicyId[],
       evaluatedAt: new Date(),
     };
   }
 
-  private static describeReason(result: AuthorizationResult): string {
-    if (result.effect === "DENY") {
-      if (result.abacDecision === "DENY") {
-        return `Denied: an applicable policy denies this action (matched: ${result.matchedPolicyIds.join(", ")}).`;
-      }
-      if (result.rbacDecision === "DENY") {
-        return "Denied: role/permission grant denies this action.";
-      }
-      return "Denied: no role grant or policy permits this action (fail-closed default).";
-    }
+  /**
+   * Phrases the decision for a caller.
+   *
+   * Written as sentences rather than passing the service's own `reason`
+   * through: that one is terse and internal ("ABAC policy permit"), and this is
+   * the string a route handler surfaces and an audit entry records. The layer
+   * that decided is named because "denied" and "denied because nothing matched"
+   * send a reader to different places — the first looks like a bug, the second
+   * like missing configuration.
+   *
+   * Driven by `source`, the single layer that produced the returned effect. An
+   * earlier version branched on `abacDecision` and `rbacDecision` fields that
+   * the decision does not have.
+   */
+  private static describeReason(result: DomainAuthorizationDecision): string {
+    const matched =
+      result.matchedPolicyIds.length > 0
+        ? ` (matched: ${result.matchedPolicyIds.join(", ")})`
+        : "";
+    const granted = result.effect === "PERMIT";
 
-    if (result.rbacDecision === "PERMIT") {
-      return "Granted: role/permission grant permits this action.";
+    switch (result.source) {
+      case "rbac":
+        return granted
+          ? "Granted: role/permission grant permits this action."
+          : "Denied: role/permission grant denies this action.";
+      case "abac":
+      case "composition":
+        if (granted) {
+          return result.source === "composition"
+            ? `Granted: role grant and policy together permit this action${matched}.`
+            : `Granted: an applicable policy permits this action${matched}.`;
+        }
+        // An empty `matchedPolicyIds` is the difference between "a policy said
+        // no" and "nothing said yes". The service reports both as `abac` with a
+        // DENY effect -- it reserves `fail-closed` for a layer that failed, not
+        // for a layer with no opinion -- so the matched set is what separates
+        // them, and the two send a reader somewhere quite different.
+        return result.matchedPolicyIds.length > 0
+          ? `Denied: an applicable policy denies this action${matched}.`
+          : "Denied: no role grant or policy permits this action (fail-closed default).";
+      case "fail-closed":
+        // Reserved for a layer that could not answer: a malformed request, or an
+        // unreachable role store or policy repository. Denying is correct, but it
+        // must not read as a deliberate policy decision.
+        return `Denied: the authorization layer could not complete the check (${result.reason}).`;
     }
-    return `Granted: an applicable policy permits this action (matched: ${result.matchedPolicyIds.join(", ")}).`;
   }
+
 }

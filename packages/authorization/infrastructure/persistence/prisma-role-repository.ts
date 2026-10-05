@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@verixa/database";
-import { Result } from "@verixa/shared-kernel";
 
 import type { RoleRepository } from "../../application/ports/role-repository.js";
 import { Role, type RoleId } from "../../domain/entities/role.js";
@@ -101,7 +100,7 @@ export class PrismaRoleRepository implements RoleRepository {
         }
       });
     } catch (error) {
-      throw mapPrismaError(error, "Role");
+      return mapPrismaError(error, "Role");
     }
   }
 
@@ -113,7 +112,7 @@ export class PrismaRoleRepository implements RoleRepository {
       });
       return row === null ? undefined : toDomain(row);
     } catch (error) {
-      throw mapPrismaError(error, "Role");
+      return mapPrismaError(error, "Role");
     }
   }
 
@@ -126,7 +125,7 @@ export class PrismaRoleRepository implements RoleRepository {
       });
       return row === null ? undefined : toDomain(row);
     } catch (error) {
-      throw mapPrismaError(error, "Role");
+      return mapPrismaError(error, "Role");
     }
   }
 
@@ -138,7 +137,7 @@ export class PrismaRoleRepository implements RoleRepository {
       });
       return rows.map(toDomain);
     } catch (error) {
-      throw mapPrismaError(error, "Role");
+      return mapPrismaError(error, "Role");
     }
   }
 
@@ -165,7 +164,7 @@ export class PrismaRoleRepository implements RoleRepository {
       await this.prisma.role.delete({ where: { id } });
     } catch (error) {
       if (error instanceof SystemRoleImmutableError) throw error;
-      throw mapPrismaError(error, "Role");
+      return mapPrismaError(error, "Role");
     }
   }
 }

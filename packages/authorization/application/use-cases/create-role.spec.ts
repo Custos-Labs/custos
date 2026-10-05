@@ -1,4 +1,4 @@
-import { asId, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Permission } from "../../domain/value-objects/permission.js";
@@ -54,18 +54,6 @@ describe("CreateRole", () => {
     if (Result.isErr(duplicate)) {
       expect(duplicate.error.code).toBe("CONFLICT");
       expect(duplicate.error.message).toContain('Role with name "viewer" already exists');
-    }
-  });
-
-  it("rejects duplicate global role name", async () => {
-    const first = await createRole.execute({ name: "global-auditor" });
-    expect(Result.isOk(first)).toBe(true);
-
-    const duplicate = await createRole.execute({ name: "global-auditor" });
-    expect(Result.isErr(duplicate)).toBe(true);
-    if (Result.isErr(duplicate)) {
-      expect(duplicate.error.code).toBe("CONFLICT");
-      expect(duplicate.error.message).toContain("already exists globally");
     }
   });
 

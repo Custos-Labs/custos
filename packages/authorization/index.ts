@@ -17,7 +17,6 @@ export type { AttributeBag, AttributeContext, AuthorizationRequest, ResourceRef,
 export type { PolicyDecisionPoint, PolicyEvaluation } from "./application/ports/policy-decision-point.js";
 export type { RoleCheckRequest, RoleDecision, RoleDecisionKind, RolePermissionGate } from "./application/ports/role-permission-gate.js";
 export { AuthorizationService } from "./application/services/authorization-service.js";
-export type { AuthorizationResult, AuthorizeParams } from "./application/services/authorization-service.js";
 export type { PermissionRepository } from "./application/ports/permission-repository.js";
 export type { RoleRepository } from "./application/ports/role-repository.js";
 export type { FindUserRoleAssignmentsOptions, UserRoleAssignmentRepository } from "./application/ports/user-role-assignment-repository.js";

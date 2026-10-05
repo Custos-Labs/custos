@@ -47,7 +47,6 @@ describe("requirePermission Fastify route guards", () => {
     // Create roles
     const editorRole = Role.create({
       name: "editor",
-      orgId: orgAlpha,
       permissions: ["articles:read", "articles:write"],
     });
     if (!Result.isOk(editorRole)) throw new Error("setup error");
@@ -55,7 +54,6 @@ describe("requirePermission Fastify route guards", () => {
 
     const billingRole = Role.create({
       name: "billing-manager",
-      orgId: orgAlpha,
       permissions: ["billing:manage"],
     });
     if (!Result.isOk(billingRole)) throw new Error("setup error");

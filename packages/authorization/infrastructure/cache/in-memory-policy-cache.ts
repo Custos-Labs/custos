@@ -58,26 +58,26 @@ export class InMemoryPolicyCache implements PolicyCache {
     this.now = options.now ?? Date.now;
   }
 
-  async get<TValue>(key: PolicyCacheKey): Promise<CachedPolicy<TValue> | undefined> {
+  get<TValue>(key: PolicyCacheKey): Promise<CachedPolicy<TValue> | undefined> {
     const stored = this.entries.get(this.entryKey(key));
     if (stored === undefined) {
-      return undefined;
+      return Promise.resolve(undefined);
     }
 
     if (stored.expiresAt <= this.now()) {
       // Lazy expiry: a read is the only moment we must be correct about it.
       this.entries.delete(this.entryKey(key));
-      return undefined;
+      return Promise.resolve(undefined);
     }
 
-    return {
+    return Promise.resolve({
       value: stored.value as TValue,
       policyVersion: stored.policyVersion,
       cachedAt: stored.cachedAt,
-    };
+    });
   }
 
-  async set<TValue>(
+  set<TValue>(
     key: PolicyCacheKey,
     entry: CachedPolicy<TValue>,
     options: PolicyCacheSetOptions = {},
@@ -86,7 +86,7 @@ export class InMemoryPolicyCache implements PolicyCache {
     if (ttlSeconds <= 0) {
       // A non-positive TTL can never be read back, so writing it is dead work —
       // and, worse, it would look like a successful write to the caller.
-      return;
+      return Promise.resolve();
     }
 
     this.entries.set(this.entryKey(key), {
@@ -95,18 +95,22 @@ export class InMemoryPolicyCache implements PolicyCache {
       cachedAt: entry.cachedAt,
       expiresAt: this.now() + ttlSeconds * 1000,
     });
+    return Promise.resolve();
   }
 
-  async invalidate(key: PolicyCacheKey): Promise<void> {
+  invalidate(key: PolicyCacheKey): Promise<void> {
     this.entries.delete(this.entryKey(key));
+    return Promise.resolve();
   }
 
-  async invalidateResourceType(resourceType: string): Promise<void> {
+  invalidateResourceType(resourceType: string): Promise<void> {
     this.generations.set(resourceType, this.generationFor(resourceType) + 1);
+    return Promise.resolve();
   }
 
-  async invalidateAll(): Promise<void> {
+  invalidateAll(): Promise<void> {
     this.globalGeneration += 1;
+    return Promise.resolve();
   }
 
   /**

@@ -1,4 +1,4 @@
-import { asId, Result, ValidationError } from "@verixa/shared-kernel";
+import { Result, ValidationError } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
 import { SystemRoleImmutableError } from "../errors/system-role-immutable-error.js";

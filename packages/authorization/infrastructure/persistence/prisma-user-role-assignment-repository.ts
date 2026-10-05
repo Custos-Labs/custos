@@ -94,7 +94,7 @@ export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRep
         update: row,
       });
     } catch (error) {
-      throw mapPrismaError(error, "UserRoleAssignment");
+      return mapPrismaError(error, "UserRoleAssignment");
     }
   }
 
@@ -103,7 +103,7 @@ export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRep
       const row = await this.prisma.userRoleAssignment.findUnique({ where: { id } });
       return row === null ? undefined : toDomain(row);
     } catch (error) {
-      throw mapPrismaError(error, "UserRoleAssignment");
+      return mapPrismaError(error, "UserRoleAssignment");
     }
   }
 
@@ -118,7 +118,7 @@ export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRep
       });
       return rows.map(toDomain);
     } catch (error) {
-      throw mapPrismaError(error, "UserRoleAssignment");
+      return mapPrismaError(error, "UserRoleAssignment");
     }
   }
 
@@ -144,7 +144,7 @@ export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRep
       });
       return rows.map(toDomain);
     } catch (error) {
-      throw mapPrismaError(error, "UserRoleAssignment");
+      return mapPrismaError(error, "UserRoleAssignment");
     }
   }
 
@@ -153,7 +153,7 @@ export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRep
     try {
       await this.prisma.userRoleAssignment.deleteMany({ where: { id } });
     } catch (error) {
-      throw mapPrismaError(error, "UserRoleAssignment");
+      return mapPrismaError(error, "UserRoleAssignment");
     }
   }
 }
