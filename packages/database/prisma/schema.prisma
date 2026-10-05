@@ -407,7 +407,6 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
-
 /// Append-only, hash-chained record of security-relevant events (Phase 10).
 ///
 /// Each row commits to its predecessor, so altering or removing one breaks
