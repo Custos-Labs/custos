@@ -32,15 +32,12 @@
     "@verixa/credentials": "workspace:*",
     "@verixa/database": "workspace:*",
     "@verixa/identity": "workspace:*",
+    "@verixa/mfa": "workspace:*",
     "@verixa/sessions": "workspace:*",
     "@verixa/shared-kernel": "workspace:*",
     "@verixa/stellar-anchor": "workspace:*",
     "fastify": "^5.12.1",
-    "ioredis": "^5.4.1"
-    "@verixa/mfa": "workspace:*",
-    "@verixa/shared-kernel": "workspace:*",
-    "@verixa/stellar-anchor": "workspace:*",
-    "fastify": "^5.12.1",
+    "ioredis": "^5.4.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
