@@ -751,6 +751,77 @@ model MfaMethod {
   @@map("mfa_methods")
 }
 
+/// A logged-in session for a user (Issue 096). Maps to the `Session` entity in
+/// packages/sessions/domain/entities/session.ts.
+///
+/// Holds no token material — that lives on `RefreshToken`, one-to-many below
+/// — so that reading a `Session` row for display (Issue 095's "manage your
+/// devices" view) can never expose something a token thief could replay.
+/// See docs/security/token-storage.md.
+model Session {
+  id String @id @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+
+  createdAt  DateTime @map("created_at") @db.Timestamptz(3)
+  /// Bumped on every successful `RefreshAccessToken` call. Compared against
+  /// the expiry policy's idle timeout, independent of `expiresAt` below.
+  lastSeenAt DateTime @map("last_seen_at") @db.Timestamptz(3)
+  /// Absolute cap on the session's lifetime, set once at `open()` and never
+  /// extended — the backstop against a session living forever just because
+  /// it keeps getting used. See `SessionExpiryPolicy`.
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  /// NULL means still active. Set by `Logout`, `LogoutEverywhere`, or
+  /// automatically on detected refresh-token reuse.
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  /// `Cascade`: a session for a deleted user is meaningless and should not
+  /// outlive the account, matching `Credential`/`MfaMethod`.
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  /// Supports "this user's active sessions" (Issue 095's `ListActiveSessions`)
+  /// and `LogoutEverywhere`'s bulk revoke.
+  @@index([userId])
+  /// Supports an expiry sweep, the same shape as the token tables above.
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// One link in a session's refresh-token rotation chain. Maps to the
+/// `RefreshToken` entity in packages/sessions/domain/entities/refresh-token.ts.
+///
+/// Consumed rows are kept, not deleted — `usedAt` being already set on a
+/// presented token is the reuse-detection signal `RefreshAccessToken` and
+/// `RefreshTokenReuseDetected` depend on. Deleting on rotation would erase
+/// exactly the evidence that a stolen token was replayed.
+model RefreshToken {
+  id String @id @db.Uuid
+
+  sessionId String @map("session_id") @db.Uuid
+
+  /// SHA-256 of the raw refresh token. Never the token itself — same
+  /// reasoning as `Invitation.tokenHash` and `docs/security/token-storage.md`.
+  tokenHash String @unique @map("token_hash")
+
+  createdAt DateTime  @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  /// Set once this token is redeemed and rotated out. NULL means still
+  /// current. A timestamp, not a boolean, for the same reason as
+  /// `EmailVerificationToken.consumedAt`.
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  /// `Cascade`: a refresh token cannot outlive the session it rotates within.
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 /// Mirrors the VerificationTypeValue union in
 /// packages/verification/domain/value-objects/verification-type.ts. Prisma
 /// enum member names cannot contain a hyphen, so the domain's

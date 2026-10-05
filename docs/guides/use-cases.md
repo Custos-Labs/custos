@@ -224,6 +224,49 @@ implemented anywhere yet, which is a different thing from being designed
 wrong. See `docs/guides/domain-modeling.md` for the general principle this
 follows.
 
+## Read models shaped for their consumer: `ListActiveSessions`
+
+`ListActiveSessions` (`packages/sessions/application/use-cases/list-active-sessions.ts`,
+Issue 095) is the first use case whose return type isn't the entity it loaded.
+It loads `Session` aggregates from the repository, but returns
+`SessionSummary[]` — a shape with no field capable of holding token material,
+because a `Session` itself holds none (see `docs/security/token-storage.md`),
+but a summary is also missing anything else a "manage your devices" screen has
+no use for.
+
+The point isn't just "don't return the entity directly" as a blanket rule —
+plenty of use cases in this file do exactly that. It's that a _read model_
+consumed outside the process (here, eventually over HTTP in Phase 12) should
+be shaped for what its consumer needs to see, decided once at the use-case
+boundary, rather than trusting every future caller between here and the
+network to remember which fields are safe to serialize. A field that
+shouldn't be exposed is easiest to guarantee absent by never putting it in the
+type in the first place, rather than by remembering to strip it later.
+
+### Scoping is enforced here, not trusted from the caller
+
+The command takes both a `requestingUserId` and a `targetUserId`, and the use
+case itself rejects `requestingUserId !== targetUserId` unless the caller
+explicitly passes `asAdmin: true`. This follows the same division of
+responsibility `SuspendUser`/`ReactivateUser` draw between _why_ an action is
+allowed and _what_ is structurally possible: the interface layer (Phase 12) is
+responsible for setting `asAdmin` only when the caller's authenticated
+identity actually carries an admin role, and this use case trusts the flag
+it's handed rather than re-deriving authorization from scratch. What it does
+not trust is silence — omitting `asAdmin` (or defaulting it to `false`) is
+what makes "list my own sessions" the only thing that happens without an
+explicit, checkable admin decision upstream.
+
+### Filtering happens after the read, using the same domain rule everything else uses
+
+`Session.isActive(policy, now)` — the same method `RefreshAccessToken` and
+`Logout` rely on for exactly the same question — is what decides whether a
+loaded session belongs in the result. A revoked session, an idle-expired one,
+and one past its absolute lifetime are all filtered out identically. There is
+no separate "is this worth showing the user" rule duplicated at the use-case
+layer: a session the domain considers inactive is not a device the user can
+still do anything with, and showing it as though it were logged in would be
+misleading rather than merely stale.
 ## Streaming a large result: `ExportAuditEvents`
 
 `ExportAuditEvents` (`packages/audit/application/use-cases/export-audit-events.ts`,

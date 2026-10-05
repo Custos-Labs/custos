@@ -34,6 +34,13 @@ export default mergeConfig(
           // nothing in the domain layer had changed. The gate is here to say
           // something about code consumers depend on.
           "**/scripts/**",
+          // Same reasoning as the Prisma adapters above, applied to the other
+          // real infrastructure this package has: `RedisRevocationList` needs
+          // a live Redis to exercise meaningfully. `InMemoryRevocationList`
+          // satisfies the exact same `RevocationList` port and is what every
+          // use case's test actually exercises, so the port's behavior is
+          // covered even though this specific adapter isn't.
+          "**/infrastructure/redis-revocation-list.ts",
         ],
         thresholds: {
           statements: 90,

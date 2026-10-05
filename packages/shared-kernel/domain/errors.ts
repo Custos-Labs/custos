@@ -54,6 +54,24 @@ export class ConflictError extends DomainError {
 }
 
 /**
+ * The caller is authenticated but is not allowed to perform the requested
+ * action on the requested resource.
+ *
+ * Distinct from {@link AuthenticationError} (401, "I don't know who you
+ * are") and from {@link NotFoundError} (which some flows use instead of this
+ * one, deliberately, to avoid confirming a resource exists to a caller who
+ * shouldn't see it — see the id-vs-existence note on each port that makes
+ * that choice). Use `AuthorizationError` when the resource's existence is
+ * not itself sensitive and the caller already knows what they asked for,
+ * e.g. "these are not your sessions" — the caller supplied their own user
+ * id and just isn't allowed to read someone else's list.
+ */
+export class AuthorizationError extends DomainError {
+  readonly code = "AUTHORIZATION_FAILED";
+  readonly httpStatusHint = 403;
+}
+
+/**
  * Authentication failed, and the response deliberately does not say why.
  *
  * The one domain error whose *message* is part of its security contract. A

@@ -57,6 +57,37 @@ const envSchema = z.object({
   DATABASE_POOL_TIMEOUT_SECONDS: z.coerce.number().int().positive().max(300).default(10),
 
   /**
+   * Connection string for the revocation-list store used by
+   * `@verixa/sessions`'s `RedisRevocationList` (Phase 05, Issue 096).
+   *
+   * Defaults to the instance `docker-compose.yml` provisions for local
+   * development — same reasoning as `DATABASE_URL`'s default. Was already
+   * documented in `.env.example` ahead of any code reading it; this is that
+   * code.
+   */
+  REDIS_URL: z.string().url().default("redis://localhost:6379"),
+
+  /**
+   * HMAC key `@verixa/sessions`'s `JwtTokenSigner` signs and verifies access
+   * tokens with (Issue 096).
+   *
+   * Unlike `DATABASE_URL`, this has **no default**. A database URL pointing
+   * at the wrong (but real) database is a mistake you notice; a signing key
+   * everyone's `.env.example` shares is a mistake you don't, because nothing
+   * about a session issued with it looks wrong until someone who copied the
+   * same public default forges one. Access tokens are bearer credentials —
+   * see `docs/security/token-storage.md` on why those get no free passes on
+   * secrecy just because a workflow is convenient. Every environment,
+   * including local development, generates its own with e.g. `openssl rand
+   * -base64 48`.
+   *
+   * 32 characters is a floor, not a target — it stops a trivially short
+   * placeholder from validating, not a guarantee of adequate entropy on its
+   * own. Phase 11 covers key management (rotation, storage) properly.
+   */
+  SESSION_ACCESS_TOKEN_SECRET: z
+    .string()
+    .min(32, "must be at least 32 characters — generate one with `openssl rand -base64 48`"),
    * Maximum simultaneous active sessions a single user may hold (Issue 094).
    * Logging in past this limit evicts the least-recently-active session —
    * see `IssueSession` in `@verixa/sessions`.

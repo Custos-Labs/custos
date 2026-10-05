@@ -167,6 +167,12 @@ jobs:
       - name: Identity coverage gate
         run: pnpm --filter @verixa/identity run test:coverage
 
+      # Same pattern applied to packages/sessions (Issue 097): session and
+      # token logic is among the highest-stakes code in the system, so it's
+      # held to the same enforced floor as identity rather than trusted to
+      # `pnpm test` alone.
+      - name: Sessions coverage gate
+        run: pnpm --filter @verixa/sessions run test:coverage
       # packages/credentials is the second fully-built bounded context,
       # following the Phase 02 coverage-gate pattern established in Issue 037.
       # Enforced separately from the plain `pnpm test` above to keep coverage
