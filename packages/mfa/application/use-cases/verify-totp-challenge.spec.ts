@@ -61,7 +61,7 @@ describe("VerifyTotpChallenge", () => {
     // Method already used at step 1000
     const method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" })
       .activate()
-      .recordUse(1000, new Date());
+      .recordTotpUse(1000, new Date());
     await fakeRepo.save(method);
 
     // Try to reuse a code that matches step 1000

@@ -19,6 +19,7 @@ import {
   isUnderfundedLedgerError,
   loggingFundingAlerter,
 } from "./balance-monitor.js";
+import { LocalTransactionSigner } from "./signing/local-transaction-signer.js";
 import { StellarHashAnchor } from "./stellar/stellar-hash-anchor.js";
 
 const PUBLIC_KEY = "GANCHORAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABCDEFG";
@@ -266,7 +267,7 @@ describe("StellarHashAnchor funding guard", () => {
     // report: no fee is spent, and no half-committed hash is left behind.
     const { monitor, reader } = harness([{ balanceStroops: 50 }], { feeStroops: 100 });
     const declining = new StellarHashAnchor({
-      secretKey: Keypair.random().secret(),
+      signer: new LocalTransactionSigner(Keypair.random().secret()),
       network: "testnet",
       fundingGuard: monitor,
     });
@@ -288,7 +289,7 @@ describe("StellarHashAnchor funding guard", () => {
     // nothing or hides an account that has run dry.
     const reported: string[] = [];
     const anchor = new StellarHashAnchor({
-      secretKey: Keypair.random().secret(),
+      signer: new LocalTransactionSigner(Keypair.random().secret()),
       network: "testnet",
       horizonUrl: "https://verixa-anchor-unreachable.invalid",
       fundingGuard: {
@@ -306,7 +307,7 @@ describe("StellarHashAnchor funding guard", () => {
   it("hands the guard's refusal back unchanged", async () => {
     const guardError = new AnchorError("the guard's own words");
     const anchor = new StellarHashAnchor({
-      secretKey: Keypair.random().secret(),
+      signer: new LocalTransactionSigner(Keypair.random().secret()),
       network: "testnet",
       fundingGuard: {
         beforeAnchor: () => Promise.resolve(Result.err(guardError)),

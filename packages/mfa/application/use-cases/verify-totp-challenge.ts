@@ -61,7 +61,7 @@ export class VerifyTotpChallenge {
 
     try {
       // Record use updates lastUsedAt and enforces replay protection against the matchedStep
-      const verifiedMethod = method.recordUse(matchedStep, now);
+      const verifiedMethod = method.recordTotpUse(matchedStep, now);
       await this.mfaMethodRepository.save(verifiedMethod);
       return Result.ok(undefined);
     } catch {

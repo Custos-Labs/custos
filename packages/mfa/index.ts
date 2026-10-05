@@ -81,8 +81,66 @@ export {
   type RecoverMfaAccessCommand,
 } from "./application/use-cases/recover-mfa-access.js";
 
+// Domain: WebAuthn entities and events
+export {
+  WebAuthnCredential,
+  type WebAuthnCredentialId,
+  type WebAuthnCredentialProps,
+} from "./domain/entities/webauthn-credential.js";
+export {
+  WebAuthnChallenge,
+  type WebAuthnCeremonyType,
+  type WebAuthnChallengeId,
+  type WebAuthnChallengeProps,
+} from "./domain/entities/webauthn-challenge.js";
+export {
+  WebAuthnCloneSuspected,
+  type WebAuthnCloneSuspectedProps,
+} from "./domain/events/webauthn-clone-suspected.js";
+
+// Application: WebAuthn ports
+export type { WebAuthnCredentialRepository } from "./application/ports/webauthn-credential-repository.js";
+export type { WebAuthnChallengeRepository } from "./application/ports/webauthn-challenge-repository.js";
+export type {
+  AttestationVerifier,
+  VerifiedAttestation,
+  VerifyAttestationOptions,
+} from "./application/ports/attestation-verifier.js";
+export type {
+  AssertionVerifier,
+  VerifiedAssertion,
+  VerifyAssertionOptions,
+} from "./application/ports/assertion-verifier.js";
+
+// Application: WebAuthn use cases
+export {
+  RegisterWebAuthnCredential,
+  type IssueRegistrationChallengeCommand,
+  type IssueRegistrationChallengeResult,
+  type RegisterWebAuthnCredentialCommand,
+  type RegisterWebAuthnCredentialConfig,
+  type RegisterWebAuthnCredentialError,
+  type RegisterWebAuthnCredentialResult,
+} from "./application/use-cases/register-webauthn-credential.js";
+export {
+  VerifyWebAuthnAssertion,
+  type IssueAuthenticationChallengeCommand,
+  type IssueAuthenticationChallengeResult,
+  type VerifyWebAuthnAssertionCommand,
+  type VerifyWebAuthnAssertionConfig,
+  type VerifyWebAuthnAssertionError,
+  type VerifyWebAuthnAssertionResult,
+} from "./application/use-cases/verify-webauthn-assertion.js";
+
+// Infrastructure: WebAuthn verifiers
+export { WebAuthnAttestationVerifier } from "./infrastructure/webauthn/attestation-verifier.js";
+export { WebAuthnAssertionVerifier } from "./infrastructure/webauthn/assertion-verifier.js";
+
 // Infrastructure: persistence adapter
 export { PrismaMfaMethodRepository } from "./infrastructure/persistence/prisma-mfa-method-repository.js";
 
 // Infrastructure: testing fakes
 export { InMemoryMfaMethodRepository } from "./infrastructure/testing/in-memory-mfa-method-repository.js";
+export { InMemoryWebAuthnCredentialRepository } from "./infrastructure/fakes/in-memory-webauthn-credential-repository.js";
+export { InMemoryWebAuthnChallengeRepository } from "./infrastructure/fakes/in-memory-webauthn-challenge-repository.js";
+export { InMemoryDomainEventPublisher } from "./infrastructure/fakes/in-memory-domain-event-publisher.js";

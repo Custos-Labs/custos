@@ -1,7 +1,7 @@
 import { Result, ValidationError } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
-import { AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
+import { AuditLogEntry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
 import {
   InMemoryAnchorRecordRepository,
   InMemoryAuditLogRepository,
@@ -24,7 +24,7 @@ async function seed(repository: InMemoryAuditLogRepository, count: number): Prom
       previous,
       occurredAt: new Date(1_700_000_000_000 + (previous?.sequence ?? 0) * 1000),
     });
-    await repository.append(entry);
+    await repository.append(entry, previous?.hash ?? GENESIS_HASH);
     previous = entry;
   }
   return previous!;

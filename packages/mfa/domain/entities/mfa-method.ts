@@ -41,7 +41,7 @@ const MAX_LOCKOUT_MS = 60 * 60 * 1_000;
  * helpers the persistence adapter needs.
  *
  * Transitions mutate the instance and return `this` so callers may either chain
- * (`method.activate().recordUse(step)`) or ignore the return value — the two
+ * (`method.activate().recordTotpUse(step)`) or ignore the return value — the two
  * call styles the surviving call sites use.
  */
 export class MfaMethod {
@@ -119,6 +119,35 @@ export class MfaMethod {
     return MfaMethod.create(userId, "totp", secret.value, now);
   }
 
+  /**
+   * Enrolls a method that is already `active`.
+   *
+   * TOTP enrolls as `pending` and is confirmed by a first successful code,
+   * because the server cannot otherwise know the user stored the secret.
+   * WebAuthn has no equivalent step: the registration ceremony verifies an
+   * attestation before anything is persisted, so a method that exists at all
+   * is one the authenticator has already demonstrated it holds.
+   */
+  public static createActive(
+    userId: UserId,
+    type: MfaMethodType,
+    now: Date = new Date(),
+  ): MfaMethod {
+    return new MfaMethod({
+      id: createId<"MfaMethodId">(),
+      userId,
+      type,
+      status: "active",
+      secret: null,
+      lastUsedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      failedAttempts: 0,
+      lockedUntil: null,
+      lastUsedStep: null,
+    });
+  }
+
   /** Rehydrates a method from persistence. */
   public static load(props: MfaMethodProps): MfaMethod {
     return new MfaMethod(props);
@@ -184,27 +213,46 @@ export class MfaMethod {
   }
 
   /**
-   * Records a successful challenge at a particular TOTP time step.
+   * Records a successful challenge, clearing the failure counter and lockout.
    *
-   * Rejects replays: clock-drift tolerance widens the window in which a single
-   * code is valid, so a code whose step is not strictly greater than the last
-   * consumed step is refused. Resets the failure counter on success.
+   * This carries no replay protection of its own, because not every factor
+   * needs it here. A WebAuthn assertion is protected by the authenticator's
+   * monotonic `signCount`, which lives on `WebAuthnCredential` and is checked
+   * there — a counter that fails to advance is what clone detection looks for.
+   * TOTP has no such per-credential counter and must use
+   * {@link recordTotpUse} instead.
    */
-  recordUse(matchedStep: number, now: Date = new Date()): this {
+  recordUse(now: Date = new Date()): this {
     if (this.props.status !== "active") {
       throw new Error("Only active methods can be used for verification.");
-    }
-    if (this.props.lastUsedStep !== null && matchedStep <= this.props.lastUsedStep) {
-      throw new Error("Replay detected: step has already been consumed.");
     }
     this.props = {
       ...this.props,
       lastUsedAt: now,
       failedAttempts: 0,
       lockedUntil: null,
-      lastUsedStep: matchedStep,
       updatedAt: now,
     };
+    return this;
+  }
+
+  /**
+   * Records a successful TOTP challenge at a particular time step.
+   *
+   * Rejects replays: clock-drift tolerance widens the window in which a single
+   * code is valid, so a code whose step is not strictly greater than the last
+   * consumed step is refused. The step is checked before anything is mutated,
+   * so a rejected replay leaves the method exactly as it was.
+   */
+  recordTotpUse(matchedStep: number, now: Date = new Date()): this {
+    if (this.props.status !== "active") {
+      throw new Error("Only active methods can be used for verification.");
+    }
+    if (this.props.lastUsedStep !== null && matchedStep <= this.props.lastUsedStep) {
+      throw new Error("Replay detected: step has already been consumed.");
+    }
+    this.recordUse(now);
+    this.props = { ...this.props, lastUsedStep: matchedStep };
     return this;
   }
 }

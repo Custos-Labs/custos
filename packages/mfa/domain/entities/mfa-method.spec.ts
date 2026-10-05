@@ -63,7 +63,7 @@ describe("MfaMethod", () => {
   describe("recordUse", () => {
     it("records the matched step and last-used time for an active method", () => {
       const before = Date.now();
-      const method = MfaMethod.create(userId, "totp").activate().recordUse(1000);
+      const method = MfaMethod.create(userId, "totp").activate().recordTotpUse(1000);
 
       expect(method.lastUsedStep).toBe(1000);
       expect(method.lastUsedAt).not.toBeNull();
@@ -72,12 +72,12 @@ describe("MfaMethod", () => {
 
     it("refuses to use a pending method", () => {
       const method = MfaMethod.create(userId, "totp");
-      expect(() => method.recordUse(1000)).toThrow(/Only active methods/);
+      expect(() => method.recordTotpUse(1000)).toThrow(/Only active methods/);
     });
 
     it("refuses a replayed step", () => {
-      const method = MfaMethod.create(userId, "totp").activate().recordUse(1000);
-      expect(() => method.recordUse(1000)).toThrow(/Replay detected/);
+      const method = MfaMethod.create(userId, "totp").activate().recordTotpUse(1000);
+      expect(() => method.recordTotpUse(1000)).toThrow(/Replay detected/);
     });
   });
 
@@ -105,7 +105,7 @@ describe("MfaMethod", () => {
       for (let i = 0; i < 5; i += 1) {
         method.recordFailedAttempt(now);
       }
-      method.recordUse(1000, now);
+      method.recordTotpUse(1000, now);
       expect(method.isLockedAt(now)).toBe(false);
       expect(method.failedAttempts).toBe(0);
     });

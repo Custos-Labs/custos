@@ -1,4 +1,112 @@
-# Composition Root
+# Composition Root & Dependency Inversion Guide
+
+This guide explains Verixa's composition root architecture, wiring conventions, package boundary enforcement, and coverage gating.
+
+---
+
+> This guide was assembled from two separately-written descriptions that a
+> merge left concatenated, each with its own top-level heading. They covered
+> the same subject from different angles rather than contradicting each other,
+> so both are kept: sections 1-4 state the rules, section 5 walks the actual
+> file. Nothing was dropped.
+
+## 1. The Role of the Composition Root
+
+The composition root (`apps/api/src/composition-root.ts`) is the **single place** in the application where the object graph is constructed and concrete implementations are bound to interface ports.
+
+### Invariant: Zero Infrastructure in Domain or Application Layers
+
+Domain entities and application use cases depend exclusively on abstract ports:
+
+- A use case like `RegisterWebAuthnCredential` requires an `AttestationVerifier` and repository interfaces (`MfaMethodRepository`, `WebAuthnChallengeRepository`, `WebAuthnCredentialRepository`).
+- It has no knowledge of how those interfaces are fulfilled—whether in-memory fakes, Prisma database adapters, or hardware security modules.
+- **The rule:** No file outside `composition-root.ts` may import concrete persistence adapters or construct repository instances.
+
+### Why Explicit Construction Over Magic Dependency Injection (DI) Containers
+
+We deliberately rejected runtime reflection/DI containers (e.g. Inversify, NestJS decorators, Awilix):
+
+- **Compile-Time Type Safety:** When a use case gains a dependency or change in configuration, TypeScript immediately flags missing arguments in `composition-root.ts` at build time.
+- **No Hidden Lifecycle Regressions:** In DI containers, missing or circular dependencies fail at runtime during production boot rather than at compile time.
+- **Readability:** Anyone reading `composition-root.ts` can trace the exact instantiation and lifecycle of every component without memorizing container DSLs or token registries.
+
+---
+
+## 2. Multi-Factor Authentication (MFA) Wiring (`packages/mfa`)
+
+Phase 06 introduces `@verixa/mfa` into the application container:
+
+```ts
+export interface MfaUseCases {
+  readonly registerWebAuthnCredential: RegisterWebAuthnCredential;
+  readonly verifyWebAuthnAssertion: VerifyWebAuthnAssertion;
+}
+
+export interface Container {
+  readonly prisma: PrismaClient;
+  readonly identity: IdentityUseCases;
+  readonly credentials: CredentialUseCases;
+  readonly audit: AuditUseCases;
+  readonly mfa: MfaUseCases;
+  readonly dispose: () => Promise<void>;
+}
+```
+
+### WebAuthn Configuration & Verifiers
+
+The composition root reads environment configuration for WebAuthn ceremony verification:
+
+- `WEBAUTHN_RP_ID`: The Relying Party identifier (default: `localhost`).
+- `WEBAUTHN_ORIGIN`: The expected caller origin (default: `http://localhost:3000`).
+
+Both `RegisterWebAuthnCredential` and `VerifyWebAuthnAssertion` are instantiated with concrete verifiers:
+
+- `WebAuthnAttestationVerifier`: Validates registration ceremonies and extracts attested public keys.
+- `WebAuthnAssertionVerifier`: Validates authentication ceremonies, cryptographic signatures, and monotonic signature counter clone detection.
+
+---
+
+## 3. Package Encapsulation & Boundary Enforcement
+
+Every context package (`@verixa/identity`, `@verixa/credentials`, `@verixa/mfa`) exposes a curated public surface via its root `index.ts`:
+
+- Wildcard re-exports (`export *`) are forbidden. Each entity, port, and use case is explicitly re-exported.
+- External packages cannot deep-import from internal paths (e.g. `@verixa/mfa/application/use-cases/...` or `@verixa/mfa/domain/...`).
+- **ESLint Enforcement:** `eslint.config.mjs` enforces this with `no-restricted-imports`:
+  ```js
+  {
+    files: ["**/*.ts"],
+    ignores: ["packages/identity/**", "packages/credentials/**", "packages/mfa/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@verixa/identity/*", "@verixa/credentials/*", "@verixa/mfa/*"],
+              message: "Import from the package root (`@verixa/mfa`), not a deep path.",
+            },
+          ],
+        },
+      ],
+    },
+  }
+  ```
+
+---
+
+## 4. Coverage Gate Standard
+
+Each domain context must pass automated test coverage thresholds in CI:
+
+- **Statements:** ≥ 90%
+- **Lines:** ≥ 90%
+- **Functions:** ≥ 85%
+- **Branches:** ≥ 85%
+
+Interface-only ports, testing fakes, and generated database harnesses are excluded from coverage calculations so that the gate accurately measures application and domain logic without skewing from erased TypeScript interfaces.
+
+## 5. Wiring in Practice
 
 `apps/api/src/composition-root.ts` is the only place in the system allowed to
 know which concrete implementations exist. Everything else depends on
@@ -26,12 +134,12 @@ const app = buildApp({ container }); // Fastify routes over that graph
 pointed at a throwaway database. A test that writes rows should never be one
 environment variable away from a developer's own data.
 
-## Audit
+### Audit
 
 Audit wiring is the part of the composition root with an **ordering**
 requirement, which is why it gets its own file and its own section.
 
-### Registering subscribers
+#### Registering subscribers
 
 ```ts
 // apps/api/src/composition/register-audit-subscribers.ts
@@ -52,7 +160,7 @@ const eventPublisher = new InMemoryEventPublisher();
 registerAuditSubscribers(eventPublisher, recordAuditEvent);
 ```
 
-### Why it happens here, and not later
+#### Why it happens here, and not later
 
 An event published while nobody is subscribed to it is not queued, delayed or
 replayed. It is **dropped, silently and permanently** —
@@ -84,7 +192,7 @@ record exists before the caller sees a response. The trade is that a slow
 handler blocks the request. If that ever becomes a real problem the answer is
 an out-of-process event bus, not making this one async.
 
-### The two ways an entry gets written
+#### The two ways an entry gets written
 
 Both paths exist, and which one is live changes as contexts are built:
 
@@ -103,7 +211,7 @@ Both write into one hash-chained log through `RecordAuditEvent`, so verification
 does not have to know which path produced a row. See
 `docs/guides/domain-events.md` for the publisher side of that.
 
-### Adding a subscriber
+#### Adding a subscriber
 
 A subscriber that exists, is fully tested inside `@verixa/audit`, and is never
 wired up records nothing — and fails as a missing row six months later rather
@@ -129,7 +237,7 @@ _late_ registration visible: registering anywhere other than composition means
 the first event of a process is dropped, and publishing against a bare
 container is exactly the test that catches it.
 
-### What the container exposes
+#### What the container exposes
 
 ```ts
 export interface Container {

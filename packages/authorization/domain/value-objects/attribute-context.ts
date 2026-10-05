@@ -8,6 +8,7 @@ export interface AttributeRecord {
 export type AttributeBag = Readonly<Record<string, AttributeValue | undefined>>;
 export type AttributeBagName = "subject" | "resource" | "action" | "environment";
 export type AttributeValueType = "string" | "number" | "boolean" | "date" | "array";
+export type AttributeCategory = AttributeBagName;
 
 export interface AttributeBags {
   readonly subject: AttributeBag;
@@ -20,9 +21,10 @@ const BAG_NAMES: readonly AttributeBagName[] = ["subject", "resource", "action",
 
 function cloneValue(value: AttributeValue): AttributeValue {
   if (value instanceof Date) return new Date(value.getTime());
-  if (Array.isArray(value))
+  if (Array.isArray(value)) {
     return Object.freeze((value as readonly AttributeValue[]).map((item) => cloneValue(item)));
-  if (typeof value === "object") return cloneBag(value as AttributeRecord) as AttributeValue;
+  }
+  if (typeof value === "object") return cloneBag(value as AttributeRecord) as AttributeRecord;
   return value;
 }
 
@@ -89,9 +91,13 @@ export class AttributeContext {
     Object.freeze(this);
   }
 
+  static create(bags: Partial<AttributeBags> = {}): AttributeContext {
+    return new AttributeContext(bags);
+  }
+
   get(bag: AttributeBagName, path: string): AttributeValue | undefined {
     if (!path) return undefined;
-    let current: AttributeValue | undefined = this[bag] as AttributeValue;
+    let current: AttributeValue | undefined = this[bag] as AttributeRecord;
     for (const segment of path.split(".")) {
       if (!segment || current === null || typeof current !== "object" || current instanceof Date) {
         return undefined;
@@ -144,6 +150,16 @@ export class AttributeContext {
     return this.getTyped(bag, path, "array");
   }
 
+  resolve(path: string): AttributeValue | undefined {
+    const separatorIndex = path.indexOf(".");
+    if (separatorIndex === -1) return undefined;
+
+    const category = path.slice(0, separatorIndex);
+    const key = path.slice(separatorIndex + 1);
+    if (!BAG_NAMES.includes(category as AttributeBagName)) return undefined;
+    return this[category as AttributeBagName][key];
+  }
+
   toBags(): AttributeBags {
     return {
       subject: cloneBag(this.subject),
@@ -151,41 +167,5 @@ export class AttributeContext {
       action: cloneBag(this.action),
       environment: cloneBag(this.environment),
     };
-  }
-
-  /**
-   * Builds a context from partial bags.
-   *
-   * A second implementation of this class was merged alongside this one and
-   * reached through a static factory rather than `new`, with roughly twenty
-   * call sites written against it. Both forms are kept -- the constructor is
-   * the original and this delegates to it -- so neither set of callers had to
-   * change when the two were reconciled.
-   */
-  static create(bags: Partial<AttributeBags> = {}): AttributeContext {
-    return new AttributeContext(bags);
-  }
-
-  /**
-   * Resolves a dotted path (`"resource.ownerId"`) against the four bags.
-   *
-   * The addressing scheme policy conditions use. Returns `undefined` for an
-   * unrecognised bag or a missing key within a recognised one -- both mean
-   * "no such attribute", and the evaluation engine treats them identically
-   * rather than distinguishing a typo from an absence.
-   */
-  resolve(path: string): AttributeValue | undefined {
-    const separatorIndex = path.indexOf(".");
-    if (separatorIndex === -1) return undefined;
-
-    const bag = path.slice(0, separatorIndex);
-    const key = path.slice(separatorIndex + 1);
-    if (!BAG_NAMES.includes(bag as AttributeBagName)) return undefined;
-
-    // A direct lookup, deliberately not `get()`. Only the first segment is a
-    // category; everything after it is one literal key, so an attribute
-    // genuinely named "metadata.key" resolves, where `get()` would try to
-    // walk into a nested "metadata" object that does not exist.
-    return this[bag as AttributeBagName][key];
   }
 }

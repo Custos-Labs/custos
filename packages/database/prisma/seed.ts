@@ -1,4 +1,86 @@
+import { randomUUID } from "node:crypto";
+
 import { PrismaClient } from "@prisma/client";
+
+const DEFAULT_PERMISSIONS = [
+  ["users:read", "View users"],
+  ["users:write", "Create and update users"],
+  ["roles:read", "View roles and permissions"],
+  ["roles:write", "Create and manage roles"],
+  ["orgs:read", "View organizations"],
+  ["orgs:write", "Manage organizations"],
+  ["*:*", "Unrestricted platform administration"],
+] as const;
+const DEFAULT_ROLES = [
+  { name: "super-admin", description: "Platform administrator", permissions: ["*:*"] },
+  {
+    name: "org-owner",
+    description: "Organization owner",
+    permissions: [
+      "users:read",
+      "users:write",
+      "roles:read",
+      "roles:write",
+      "orgs:read",
+      "orgs:write",
+    ],
+  },
+  { name: "member", description: "Organization member", permissions: ["users:read", "orgs:read"] },
+  {
+    name: "viewer",
+    description: "Read-only organization viewer",
+    permissions: ["users:read", "orgs:read", "roles:read"],
+  },
+] as const;
+
+async function seedDefaultRoles(prisma: PrismaClient): Promise<void> {
+  const now = new Date("2026-01-01T00:00:00.000Z");
+  const permissionIds = new Map<string, string>();
+  for (const [key, description] of DEFAULT_PERMISSIONS) {
+    const row = await prisma.permission.upsert({
+      where: { key },
+      create: { id: randomUUID(), key, description, createdAt: now },
+      update: { description },
+    });
+    permissionIds.set(key, row.id);
+  }
+  for (const definition of DEFAULT_ROLES) {
+    // Located by name alone: `Role.name` is globally unique in the schema, and
+    // there is no `organization_id` column on `roles`. The authorization
+    // domain's `Role` carries an `orgId` and `CreateRole` enforces uniqueness
+    // per organization, but no migration has ever added that column -- so this
+    // file previously filtered on `organizationId: null`, which does not
+    // compile against the generated client. See the note in the commit.
+    const existing = await prisma.role.findUnique({
+      where: { name: definition.name },
+    });
+    const role =
+      existing === null
+        ? await prisma.role.create({
+            data: {
+              id: randomUUID(),
+              name: definition.name,
+              description: definition.description,
+              isSystemRole: true,
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+        : await prisma.role.update({
+            where: { id: existing.id },
+            data: { description: definition.description, isSystemRole: true, updatedAt: now },
+          });
+    for (const key of definition.permissions) {
+      const permissionId = permissionIds.get(key);
+      if (permissionId === undefined) throw new Error(`Missing seeded permission ${key}`);
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.id, permissionId } },
+        create: { roleId: role.id, permissionId },
+        update: {},
+      });
+    }
+  }
+}
 
 /**
  * Deterministic development fixtures.
@@ -147,6 +229,8 @@ async function seed(): Promise<void> {
     });
   }
 
+  await seedDefaultRoles(prisma);
+
   // Invitations are deliberately not seeded. An invitation is only meaningful
   // alongside the raw token that was mailed to its recipient, and that token
   // is unrecoverable by design (see docs/security/token-storage.md) — a
@@ -156,7 +240,7 @@ async function seed(): Promise<void> {
 
   console.log(
     `Seeded ${String(users.length)} users, ${String(organizations.length)} organizations, ` +
-      `${String(memberships.length)} memberships.`,
+      `${String(memberships.length)} memberships and the default authorization catalog.`,
   );
 }
 

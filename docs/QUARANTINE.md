@@ -95,6 +95,54 @@ and `encryption.spec.ts` holds the regression test.
 
 The package now builds, typechecks, lints with zero errors, and passes 90 tests
 at 95% statement coverage.
+## Lifted: `packages/mfa` (2026-10-04)
+
+Released from quarantine. Kept as the worked example for the other two, because
+the interesting part was not the syntax repair.
+
+**One design was chosen.** `MfaMethod` survives as the props-object aggregate,
+because it was the only version carrying the lockout and replay state the TOTP
+use cases need. The others were deleted.
+
+**The one real collision was `recordUse`.** TOTP called
+`recordUse(matchedStep, now)`, protecting against replay by refusing a step not
+strictly greater than the last consumed one -- clock-drift tolerance means a
+single code is valid across several seconds. WebAuthn called `recordUse(now)`,
+because its replay protection is the authenticator's monotonic `signCount`,
+which lives on `WebAuthnCredential` and is where clone detection reads it.
+
+Neither caller was wrong, so neither was forced into the other's shape:
+
+- `recordUse(now)` records a success and clears the failure counter, with no
+  replay semantics of its own.
+- `recordTotpUse(matchedStep, now)` adds the step check, then delegates. The
+  step is validated before anything mutates, so a rejected replay leaves the
+  method untouched.
+
+`createActive` was added for the same reason. TOTP enrolls as `pending` and is
+confirmed by a first valid code, because the server cannot otherwise know the
+user stored the secret. WebAuthn has no equivalent: the registration ceremony
+verifies an attestation before anything persists.
+
+**A security bug was found underneath.** `infrastructure/crypto/encryption.ts`
+fell back to `Buffer.alloc(32, 1)` when `MFA_ENCRYPTION_KEY` was unset -- and
+the variable was set nowhere in the repository. Every TOTP secret would have
+been encrypted at rest under a constant visible in this source tree, with
+nothing thrown or logged. `encrypt` now refuses to run without a key and
+validates its length.
+
+**`docs/security/mfa-design.md` held three concatenated documents.** They
+covered different ground -- WebAuthn, TOTP, and step-up/backup-codes/policy --
+rather than contradicting each other, so all three became sections of one
+document. Not every concatenation is a conflict of substance; check before
+choosing.
+
+**`index.ts` held two versions**, one wildcard and one curated. The curated form
+was kept: `export *` makes the public surface whatever the files happen to
+contain, which is how internals become someone else's dependency by accident.
+
+The package now builds, typechecks, lints with zero errors, and passes its
+suite at 93% statement coverage against a 90/90/85/85 gate.
 
 ## What is still verified
 
