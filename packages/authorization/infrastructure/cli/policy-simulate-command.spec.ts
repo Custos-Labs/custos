@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -9,6 +10,7 @@ import type {
 import type { PolicySimulationReport } from "../../application/use-cases/simulate-policy.js";
 import type { AttributeContext } from "../../domain/attribute-context.js";
 import type { PolicyEffect } from "../../domain/authorization-decision.js";
+
 import {
   POLICY_SIMULATE_EXIT_CODES,
   POLICY_SIMULATE_USAGE,
@@ -30,12 +32,12 @@ class FakePolicySimulateIo implements PolicySimulateIo {
 
   constructor(private readonly files: Record<string, string> = {}) {}
 
-  async readFile(path: string): Promise<string> {
+  readFile(path: string): Promise<string> {
     const content = this.files[path];
     if (content === undefined) {
-      throw new Error(`ENOENT: no such file or directory, open '${path}'`);
+      return Promise.reject(new Error(`ENOENT: no such file or directory, open '${path}'`));
     }
-    return content;
+    return Promise.resolve(content);
   }
 
   write(line: string): void {
@@ -56,7 +58,7 @@ class FakePolicySimulateIo implements PolicySimulateIo {
 class OwnershipPolicySimulationEngine implements PolicySimulationEngine {
   readonly calls: { policy: PolicySource; context: AttributeContext }[] = [];
 
-  async simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
+  simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
     this.calls.push({ policy, context });
 
     const owns = context.resource["ownerId"] === context.subject["subjectId"];
@@ -72,13 +74,13 @@ class OwnershipPolicySimulationEngine implements PolicySimulationEngine {
       },
     ];
 
-    return {
+    return Promise.resolve({
       policyLabel: policy.kind === "stored" ? policy.ref : policy.label,
       combinedEffect,
       combiningAlgorithm: "deny-overrides",
       matchedPolicyIds: ["document-access"],
       rules: rules.map((rule) => ({ ...rule, decisive: rule.effect === combinedEffect })),
-    };
+    });
   }
 }
 
@@ -91,15 +93,15 @@ class RecordingPolicySimulationEngine implements PolicySimulationEngine {
     private readonly label?: string,
   ) {}
 
-  async simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
+  simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
     this.calls.push({ policy, context });
-    return {
+    return Promise.resolve({
       policyLabel: this.label ?? (policy.kind === "stored" ? policy.ref : policy.label),
       combinedEffect: this.effect,
       combiningAlgorithm: "deny-overrides",
       matchedPolicyIds: [],
       rules: [],
-    };
+    });
   }
 }
 
@@ -399,7 +401,7 @@ describe("policy-simulate command", () => {
     expect(io.output).toBe(POLICY_SIMULATE_USAGE);
   });
 
-  it("parses the fixture file's own policy block, stored or draft", async () => {
+  it("parses the fixture file's own policy block, stored or draft", () => {
     const stored = parseFixtureSet({ policy: STORED_POLICY, fixtures: [OWNER_FIXTURE] });
     expect(stored.kind).toBe("ok");
     if (stored.kind === "ok") {
@@ -416,7 +418,7 @@ describe("policy-simulate command", () => {
     }
   });
 
-  it("defaults omitted context axes to empty bags instead of rejecting the fixture", async () => {
+  it("defaults omitted context axes to empty bags instead of rejecting the fixture", () => {
     const parsed = parseFixtureSet({
       policy: STORED_POLICY,
       fixtures: [{ ...OWNER_FIXTURE, context: { subject: { subjectId: "user-1" } } }],

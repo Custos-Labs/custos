@@ -1,4 +1,4 @@
-import { asId, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Permission } from "../../domain/value-objects/permission.js";
@@ -26,7 +26,6 @@ describe("CreateRole", () => {
     if (Result.isOk(result)) {
       expect(result.value.name).toBe("billing-manager");
       expect(result.value.description).toBe("Manages subscriptions and invoices");
-      expect(result.value.isGlobal()).toBe(true);
       expect(result.value.hasPermission("billing:read")).toBe(true);
       expect(result.value.hasPermission("billing:write")).toBe(true);
 
@@ -36,60 +35,22 @@ describe("CreateRole", () => {
     }
   });
 
-  it("creates an organization-scoped role successfully", async () => {
-    const orgId = asId<"OrgId">("org_123");
-    const result = await createRole.execute({
+  it("rejects a duplicate name, because roles are global", async () => {
+    // Role names are unique across the deployment, not per organization:
+    // `model Role` has `name @unique` and no `organization_id`, because the set
+    // of roles a deployment supports is administrative rather than per-tenant.
+    const first = await createRole.execute({
       name: "viewer",
-      orgId,
       permissions: [Permission.from("docs:read")],
     });
-
-    expect(Result.isOk(result)).toBe(true);
-    if (Result.isOk(result)) {
-      expect(result.value.name).toBe("viewer");
-      expect(result.value.orgId).toBe(orgId);
-      expect(result.value.isScoped()).toBe(true);
-      expect(result.value.hasPermission("docs:read")).toBe(true);
-
-      const persisted = await roleRepository.findByName("viewer", orgId);
-      expect(persisted?.id).toBe(result.value.id);
-    }
-  });
-
-  it("allows identical role names across different organizations", async () => {
-    const org1 = asId<"OrgId">("org_1");
-    const org2 = asId<"OrgId">("org_2");
-
-    const res1 = await createRole.execute({ name: "editor", orgId: org1 });
-    const res2 = await createRole.execute({ name: "editor", orgId: org2 });
-
-    expect(Result.isOk(res1)).toBe(true);
-    expect(Result.isOk(res2)).toBe(true);
-  });
-
-  it("rejects duplicate role name in the same organization", async () => {
-    const orgId = asId<"OrgId">("org_abc");
-
-    const first = await createRole.execute({ name: "admin", orgId });
     expect(Result.isOk(first)).toBe(true);
 
-    const duplicate = await createRole.execute({ name: "admin", orgId });
+    const duplicate = await createRole.execute({ name: "viewer" });
+
     expect(Result.isErr(duplicate)).toBe(true);
     if (Result.isErr(duplicate)) {
       expect(duplicate.error.code).toBe("CONFLICT");
-      expect(duplicate.error.message).toContain("already exists in organization");
-    }
-  });
-
-  it("rejects duplicate global role name", async () => {
-    const first = await createRole.execute({ name: "global-auditor" });
-    expect(Result.isOk(first)).toBe(true);
-
-    const duplicate = await createRole.execute({ name: "global-auditor" });
-    expect(Result.isErr(duplicate)).toBe(true);
-    if (Result.isErr(duplicate)) {
-      expect(duplicate.error.code).toBe("CONFLICT");
-      expect(duplicate.error.message).toContain("already exists globally");
+      expect(duplicate.error.message).toContain('Role with name "viewer" already exists');
     }
   });
 

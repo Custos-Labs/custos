@@ -8,6 +8,7 @@ import type {
   PolicySource,
   SimulatedRuleOutcome,
 } from "../ports/policy-simulation-engine.js";
+
 import { SimulatePolicy, type PolicyFixtureSet } from "./simulate-policy.js";
 
 /**
@@ -21,12 +22,12 @@ class StubPolicySimulationEngine implements PolicySimulationEngine {
 
   constructor(private readonly outcome: PolicySimulationRun | Error) {}
 
-  async simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
+  simulate(policy: PolicySource, context: AttributeContext): Promise<PolicySimulationRun> {
     this.calls.push({ policy, context });
     if (this.outcome instanceof Error) {
-      throw this.outcome;
+      return Promise.reject(this.outcome);
     }
-    return this.outcome;
+    return Promise.resolve(this.outcome);
   }
 }
 

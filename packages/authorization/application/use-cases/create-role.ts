@@ -1,6 +1,6 @@
 import { ConflictError, Result, ValidationError } from "@verixa/shared-kernel";
 
-import { type OrgId, Role } from "../../domain/entities/role.js";
+import { Role } from "../../domain/entities/role.js";
 import { PermissionMatcher } from "../../domain/services/permission-matcher.js";
 import type { Permission } from "../../domain/value-objects/permission.js";
 import type { RoleRepository } from "../ports/role-repository.js";
@@ -8,7 +8,6 @@ import type { RoleRepository } from "../ports/role-repository.js";
 export interface CreateRoleCommand {
   readonly name: string;
   readonly description?: string | undefined;
-  readonly orgId?: OrgId | null | undefined;
   readonly isSystemRole?: boolean | undefined;
   readonly permissions?: Iterable<Permission | string> | undefined;
 }
@@ -16,9 +15,14 @@ export interface CreateRoleCommand {
 export type CreateRoleError = ValidationError | ConflictError;
 
 /**
- * Orchestrates creating a new Role: validate input, enforce unique role name
- * within the requested scope (per-organization or globally), construct the Role aggregate,
- * and persist it via the RoleRepository port.
+ * Orchestrates creating a new Role: validate input, enforce a unique role name,
+ * construct the Role aggregate, and persist it via the RoleRepository port.
+ *
+ * The name is unique *globally*, not per organization. Roles are an
+ * administrative concern rather than a tenant one -- see `model Role` in
+ * `packages/database/prisma/schema.prisma`, where `name` is `@unique` and there
+ * is no `organization_id`. What varies per organization is who holds a role,
+ * which `UserRoleAssignment` expresses.
  */
 export class CreateRole {
   constructor(private readonly roleRepository: RoleRepository) {}
@@ -27,7 +31,6 @@ export class CreateRole {
     const roleResult = Role.create({
       name: command.name,
       ...(command.description !== undefined ? { description: command.description } : {}),
-      ...(command.orgId !== undefined ? { orgId: command.orgId } : {}),
       ...(command.isSystemRole !== undefined ? { isSystemRole: command.isSystemRole } : {}),
       ...(command.permissions !== undefined ? { permissions: command.permissions } : {}),
     });
@@ -50,12 +53,9 @@ export class CreateRole {
       }
     }
 
-    const existing = await this.roleRepository.findByName(role.name, role.orgId);
+    const existing = await this.roleRepository.findByName(role.name);
     if (existing !== undefined) {
-      const scopeDescription = role.orgId !== null ? `in organization "${role.orgId}"` : "globally";
-      return Result.err(
-        new ConflictError(`Role with name "${role.name}" already exists ${scopeDescription}.`),
-      );
+      return Result.err(new ConflictError(`Role with name "${role.name}" already exists.`));
     }
 
     await this.roleRepository.save(role);
