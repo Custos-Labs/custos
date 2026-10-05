@@ -18,8 +18,8 @@ describe("PermissionChecker", () => {
   const regularUser = asId<"UserId">("user_regular");
   const unassignedUser = asId<"UserId">("user_unassigned");
 
-  const orgAlpha = asId<"OrgId">("org_alpha");
-  const orgBeta = asId<"OrgId">("org_beta");
+  const orgAlpha = asId<"OrganizationId">("org_alpha");
+  const orgBeta = asId<"OrganizationId">("org_beta");
 
   let readerRole: Role;
   let writerRole: Role;
@@ -33,7 +33,6 @@ describe("PermissionChecker", () => {
     // Create test roles
     const readerRes = Role.create({
       name: "reader",
-      orgId: orgAlpha,
       permissions: ["documents:read", "comments:read"],
     });
     if (Result.isOk(readerRes)) {
@@ -43,7 +42,6 @@ describe("PermissionChecker", () => {
 
     const writerRes = Role.create({
       name: "writer",
-      orgId: orgAlpha,
       permissions: ["documents:write", "comments:write"],
     });
     if (Result.isOk(writerRes)) {

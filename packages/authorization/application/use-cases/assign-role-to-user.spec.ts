@@ -14,7 +14,7 @@ describe("AssignRoleToUser", () => {
 
   const actorId = asId<"UserId">("user_admin");
   const targetUserId = asId<"UserId">("user_target");
-  const orgId = asId<"OrgId">("org_cyberdyne");
+  const orgId = asId<"OrganizationId">("org_cyberdyne");
 
   let globalAdminRole: Role;
   let scopedEditorRole: Role;
@@ -143,7 +143,7 @@ describe("AssignRoleToUser", () => {
   });
 
   it("fails if attempting to assign an organization-scoped role to another organization", async () => {
-    const anotherOrgId = asId<"OrgId">("org_other");
+    const anotherOrgId = asId<"OrganizationId">("org_other");
     const result = await assignRoleToUser.execute({
       userId: targetUserId,
       roleId: scopedEditorRole.id,

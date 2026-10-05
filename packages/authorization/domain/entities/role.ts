@@ -16,7 +16,7 @@ import { Permission } from "../value-objects/permission.js";
  * which the database was never going to support -- it is why this package's
  * Prisma adapters stopped compiling. Tenancy lives on the assignment.
  */
-export type OrgId = Id<"OrgId">;
+export type OrgId = Id<"OrganizationId">;
 export type RoleId = Id<"RoleId">;
 
 export interface RoleProps {

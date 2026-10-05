@@ -19,7 +19,7 @@ describe("createResolvePrincipalHook", () => {
   let resolveEffectivePermissionsSpy: ReturnType<typeof vi.fn>;
 
   const userId = asId<"UserId">("user_123");
-  const orgId = asId<"OrgId">("org_456");
+  const orgId = asId<"OrganizationId">("org_456");
 
   beforeEach(() => {
     resolveEffectivePermissionsSpy = vi
@@ -66,7 +66,7 @@ describe("createResolvePrincipalHook", () => {
   });
 
   it("respects custom orgIdResolver", async () => {
-    const customOrgId = asId<"OrgId">("org_custom");
+    const customOrgId = asId<"OrganizationId">("org_custom");
     const hook = createResolvePrincipalHook(mockChecker, {
       orgIdResolver: () => customOrgId,
     });

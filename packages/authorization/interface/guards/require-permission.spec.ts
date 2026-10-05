@@ -36,8 +36,8 @@ describe("requirePermission Fastify route guards", () => {
 
   const userAlice = asId<"UserId">("usr_alice");
   const userBob = asId<"UserId">("usr_bob");
-  const orgAlpha = asId<"OrgId">("org_alpha");
-  const orgBeta = asId<"OrgId">("org_beta");
+  const orgAlpha = asId<"OrganizationId">("org_alpha");
+  const orgBeta = asId<"OrganizationId">("org_beta");
 
   beforeEach(async () => {
     roleRepository = new InMemoryRoleRepository();
