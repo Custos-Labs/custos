@@ -7,6 +7,21 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: "@verixa/mfa",
+      // Excluded from the test run, not just coverage: this spec exercises an
+      // adapter for a `webauthn_credentials` table that was never migrated
+      // (no model in schema.prisma), and typechecking it required excluding
+      // it from tsconfig.json too -- see the header comment on
+      // prisma-webauthn-credential-repository.ts.
+      exclude: [
+        // Vitest's own defaults (node_modules, dist, .git, coverage, ...).
+        // `exclude` replaces rather than extends the default list, so they
+        // are restated here -- see https://vitest.dev/config/#exclude.
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/.git/**",
+        "**/coverage/**",
+        "**/infrastructure/persistence/prisma-webauthn-credential-repository.spec.ts",
+      ],
       coverage: {
         // Interface-only files have no executable statements to cover — a
         // TypeScript `interface` is erased entirely at compile time, so
