@@ -47,3 +47,9 @@ overrides:
   # qs <6.16.0: denial of service via an attacker-controlled isBuffer.
   # Transitive via the supertest/superagent chain used in integration tests.
   qs: ">=6.16.0"
+  # axios <1.20.0: multiple SSRF advisories (absolute-URL base-URL bypass,
+  # unenforced maxRedirects on the fetch adapter). Transitive via
+  # @stellar/stellar-sdk, used by packages/audit, packages/stellar-anchor
+  # and apps/api. Constrained to the 1.x line for the same reason as nanoid
+  # above.
+  axios: "^1.20.0"
