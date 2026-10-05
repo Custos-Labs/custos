@@ -4,8 +4,8 @@ import { Result } from "@verixa/shared-kernel";
 
 import { stroopsToXlm, type AnchorFundingAlert } from "../../application/ports/account-balance.js";
 import { isValidSha256Hex } from "../../application/ports/hash-anchor.js";
-import { LocalTransactionSigner } from "../signing/local-transaction-signer.js";
 import { AnchorBalanceMonitor, HorizonAccountBalanceReader } from "../balance-monitor.js";
+import { LocalTransactionSigner } from "../signing/local-transaction-signer.js";
 import { StellarHashAnchor, type StellarNetwork } from "../stellar/stellar-hash-anchor.js";
 
 /**

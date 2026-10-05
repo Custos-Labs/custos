@@ -198,6 +198,7 @@ describe("BatchedAuditWriter", () => {
 
     let conflictsForced = false;
     const racing: AuditLogRepository = {
+      findWithFilters: (params) => repository.findWithFilters(params),
       findLatest: () => repository.findLatest(),
       findFrom: (from, limit) => repository.findFrom(from, limit),
       count: () => repository.count(),
@@ -233,6 +234,7 @@ describe("BatchedAuditWriter", () => {
 
   it("reports a batch it could not write rather than losing it silently", async () => {
     const rejecting: AuditLogRepository = {
+      findWithFilters: () => Promise.resolve([]),
       findLatest: () => Promise.resolve(undefined),
       findFrom: () => Promise.resolve([]),
       count: () => Promise.resolve(0),

@@ -83,7 +83,9 @@ describe.skipIf(!available)("audit chain verification", () => {
   });
 
   function repository(): PrismaAuditLogRepository {
-    return new PrismaAuditLogRepository(prisma.auditLogEntry);
+    return new PrismaAuditLogRepository(prisma.auditLogEntry, (work) =>
+      prisma.$transaction((tx) => work(tx.auditLogEntry)),
+    );
   }
 
   /** Writes `count` entries through the production append path. */

@@ -1,3 +1,4 @@
+import { Result } from "@verixa/shared-kernel";
 import type { DomainEvent, DomainEventHandler, DomainEventPublisher } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
@@ -83,7 +84,8 @@ describe("IdentityCredentialsAuditSubscriber", () => {
     const errors: unknown[] = [];
     const repository: AuditLogRepository = {
       findLatest: () => Promise.reject(new Error("audit store unavailable")),
-      append: () => Promise.resolve(),
+      append: () => Promise.resolve(Result.ok(undefined)),
+      appendMany: () => Promise.resolve(Result.ok(undefined)),
       findFrom: () => Promise.resolve([]),
       findWithFilters: () => Promise.resolve([]),
       count: () => Promise.resolve(0),

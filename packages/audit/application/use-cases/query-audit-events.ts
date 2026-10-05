@@ -27,6 +27,24 @@ export interface QueryAuditEventsCommand {
 }
 
 /**
+ * One page of the log, plus where the next page starts.
+ *
+ * A keyset cursor rather than an offset: `OFFSET 1000` makes the database read
+ * and discard a thousand rows before returning any, and the cost grows with
+ * depth, whereas "everything after sequence N" is a range scan on an indexed
+ * column and costs the same however far into the log it reaches. The trade is
+ * that a caller can only continue forward, not jump to an arbitrary page —
+ * acceptable for an audit log, where the access pattern is "show me what
+ * happened" rather than "show me page 40".
+ */
+export interface QueryAuditEventsResult {
+  readonly entries: readonly AuditLogEntry[];
+  /** The `sequence` to pass as the next `afterSequence`, or undefined at the end. */
+  readonly nextCursor: number | undefined;
+  readonly hasMore: boolean;
+}
+
+/**
  * Reads one page of an organization's audit log, on behalf of someone allowed
  * to read it, and leaves a record that they did.
  *
@@ -56,7 +74,7 @@ export class QueryAuditEvents {
 
   async execute(
     command: QueryAuditEventsCommand,
-  ): Promise<Result<readonly AuditLogEntry[], AuditReadError>> {
+  ): Promise<Result<QueryAuditEventsResult, AuditReadError>> {
     const criteria = {
       organizationId: command.organizationId,
       actorId: command.actorId,
@@ -78,74 +96,20 @@ export class QueryAuditEvents {
       MAX_AUDIT_QUERY_PAGE_SIZE,
     );
 
-    return Result.ok(
-      await this.events.query(criteria, { afterSequence: command.afterSequence, limit }),
-    );
-import type { AuditLogEntry } from "../../domain/entities/audit-log-entry.js";
-import type { AuditLogRepository } from "../ports/audit-log-repository.js";
-
-export interface QueryAuditEventsFilters {
-  readonly actorId?: string | undefined;
-  readonly subjectId?: string | undefined;
-  readonly organizationId?: string | undefined;
-  readonly action?: string | undefined;
-  readonly fromDate?: Date | undefined;
-  readonly toDate?: Date | undefined;
-}
-
-export interface QueryAuditEventsCommand {
-  readonly filters?: QueryAuditEventsFilters;
-  readonly cursor?: number | undefined;
-  readonly limit?: number;
-}
-
-export interface QueryAuditEventsResult {
-  readonly entries: readonly AuditLogEntry[];
-  readonly nextCursor: number | undefined;
-  readonly hasMore: boolean;
-}
-
-/**
- * Queries the audit log with filtering and cursor-based pagination.
- *
- * ## Keyset (cursor-based) pagination
- *
- * Uses `sequence` as the cursor rather than offset-based pagination. An offset
- * of 1000 forces the database to read and skip 1000 rows even when none of
- * them are returned, and the cost grows linearly with depth. A keyset cursor
- * says "everything after sequence N," which is a range scan on the indexed
- * column — constant cost regardless of how far into the log the query reaches.
- *
- * The trade is that you cannot jump to an arbitrary page, only continue from
- * where you left off. That is an acceptable restriction for an audit log: the
- * typical access pattern is "show me what happened," and walking forward
- * through a result set is exactly that.
- */
-export class QueryAuditEvents {
-  constructor(private readonly repository: AuditLogRepository) {}
-
-  async execute(command: QueryAuditEventsCommand): Promise<QueryAuditEventsResult> {
-    const limit = command.limit ?? 50;
-    const cursor = command.cursor ?? 0;
-
-    // Fetch one extra to determine if there are more results
-    const entries = await this.repository.findWithFilters({
-      filters: command.filters ?? {},
-      fromSequence: cursor + 1,
+    // One row beyond the page, so "is there another page?" is answered without
+    // a second query and without reading rows that will not be returned.
+    const page = await this.events.query(criteria, {
+      afterSequence: command.afterSequence,
       limit: limit + 1,
     });
 
-    const hasMore = entries.length > limit;
-    const resultEntries = hasMore ? entries.slice(0, limit) : entries;
-    const nextCursor =
-      hasMore && resultEntries.length > 0
-        ? resultEntries[resultEntries.length - 1]!.sequence
-        : undefined;
+    const hasMore = page.length > limit;
+    const entries = hasMore ? page.slice(0, limit) : page;
 
-    return {
-      entries: resultEntries,
-      nextCursor,
+    return Result.ok({
+      entries,
       hasMore,
-    };
+      nextCursor: hasMore ? entries[entries.length - 1]?.sequence : undefined,
+    });
   }
 }

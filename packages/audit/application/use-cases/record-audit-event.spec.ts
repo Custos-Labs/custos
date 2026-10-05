@@ -36,6 +36,7 @@ function contendedRepository(rejections: number): {
   let attempts = 0;
 
   const repository: AuditLogRepository = {
+    findWithFilters: () => Promise.resolve([]),
     findLatest: () => inner.findLatest(),
     findFrom: (from, limit) => inner.findFrom(from, limit),
     count: () => inner.count(),
@@ -131,6 +132,7 @@ describe("RecordAuditEvent", () => {
     // a thrown error would report to the user a login failure that did not
     // happen — see the class comment.
     const failing: AuditLogRepository = {
+      findWithFilters: () => Promise.reject(new Error("unreachable")),
       findLatest: () => Promise.reject(new Error("connection lost")),
       append: () => Promise.reject(new Error("unreachable")),
       appendMany: () => Promise.reject(new Error("unreachable")),
@@ -209,6 +211,7 @@ describe("recordAuditEventBatch", () => {
     // write would be indistinguishable from tampering, so refusal means refusal
     // for all of it.
     const stale: AuditLogRepository = {
+      findWithFilters: (params) => repository.findWithFilters(params),
       findLatest: () => repository.findLatest(),
       findFrom: (from, limit) => repository.findFrom(from, limit),
       count: () => repository.count(),
@@ -234,6 +237,10 @@ describe("recordAuditEventBatch", () => {
   it("does not query the repository at all for an empty batch", async () => {
     let calls = 0;
     const counting: AuditLogRepository = {
+      findWithFilters: () => {
+        calls += 1;
+        return Promise.resolve([]);
+      },
       findLatest: () => {
         calls += 1;
         return Promise.resolve(undefined);
@@ -246,12 +253,8 @@ describe("recordAuditEventBatch", () => {
 
     expect(await recordAuditEventBatch(counting, [], () => undefined)).toHaveLength(0);
     expect(calls).toBe(0);
-import { describe, expect, it } from "vitest";
-
-import { AuditLogEntry, GENESIS_HASH } from "../../domain/entities/audit-log-entry.js";
-import { InMemoryAuditLogRepository } from "../../infrastructure/testing/in-memory-audit-repositories.js";
-
-import { RecordAuditEvent } from "./record-audit-event.js";
+  });
+});
 
 describe("RecordAuditEvent", () => {
   it("starts the chain at the genesis link when the log is empty", async () => {

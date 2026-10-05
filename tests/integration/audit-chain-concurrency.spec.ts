@@ -1,14 +1,16 @@
 import {
-  AuditLogEntry,
-  AuditLogEntryMapper,
   type AuditDelegate,
   type AuditTransaction,
   ChainConflictError,
-  GENESIS_HASH,
   PrismaAuditLogRepository,
   RecordAuditEvent,
   verifyChain,
 } from "@verixa/audit";
+// The testing entry point, deliberately. This suite forges a forked chain entry
+// to prove the repository refuses it, which needs the chain's own primitives.
+// They are kept off the package's main surface precisely so nothing that ships
+// can mint an entry -- see `packages/audit/testing.ts`.
+import { AuditLogEntry, AuditLogEntryMapper, GENESIS_HASH } from "@verixa/audit/testing";
 import { Result } from "@verixa/shared-kernel";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
