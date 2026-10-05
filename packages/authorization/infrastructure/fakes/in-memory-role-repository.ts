@@ -1,5 +1,5 @@
 import type { RoleRepository } from "../../application/ports/role-repository.js";
-import type { OrgId, Role, RoleId } from "../../domain/entities/role.js";
+import type { Role, RoleId } from "../../domain/entities/role.js";
 import { SystemRoleImmutableError } from "../../domain/errors/system-role-immutable-error.js";
 
 /**
@@ -16,20 +16,14 @@ export class InMemoryRoleRepository implements RoleRepository {
     return Promise.resolve(this.rolesById.get(id));
   }
 
-  findByName(name: string, orgId?: OrgId | null): Promise<Role | undefined> {
-    const targetOrgId = orgId ?? null;
+  findByName(name: string): Promise<Role | undefined> {
     const targetName = name.trim();
-
-    const match = [...this.rolesById.values()].find(
-      (role) => role.name === targetName && role.orgId === targetOrgId,
-    );
-
+    const match = [...this.rolesById.values()].find((role) => role.name === targetName);
     return Promise.resolve(match);
   }
 
-  findAllForOrg(orgId: OrgId): Promise<Role[]> {
-    const matches = [...this.rolesById.values()].filter((role) => role.orgId === orgId);
-    return Promise.resolve(matches);
+  findAll(): Promise<Role[]> {
+    return Promise.resolve([...this.rolesById.values()]);
   }
 
   save(role: Role): Promise<void> {
