@@ -159,13 +159,16 @@ describe("loadConfig", () => {
   });
 
   it("defaults SESSION_MAX_CONCURRENT_SESSIONS to 0 (disabled)", () => {
-    const config = loadConfig({});
+    const config = loadConfig({ SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET });
 
     expect(config.SESSION_MAX_CONCURRENT_SESSIONS).toBe(0);
   });
 
   it("coerces SESSION_MAX_CONCURRENT_SESSIONS from a string", () => {
-    const config = loadConfig({ SESSION_MAX_CONCURRENT_SESSIONS: "3" });
+    const config = loadConfig({
+      SESSION_ACCESS_TOKEN_SECRET: VALID_SESSION_SECRET,
+      SESSION_MAX_CONCURRENT_SESSIONS: "3",
+    });
 
     expect(config.SESSION_MAX_CONCURRENT_SESSIONS).toBe(3);
     expect(typeof config.SESSION_MAX_CONCURRENT_SESSIONS).toBe("number");

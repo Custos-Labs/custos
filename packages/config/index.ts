@@ -88,6 +88,8 @@ const envSchema = z.object({
   SESSION_ACCESS_TOKEN_SECRET: z
     .string()
     .min(32, "must be at least 32 characters — generate one with `openssl rand -base64 48`"),
+
+  /**
    * Maximum simultaneous active sessions a single user may hold (Issue 094).
    * Logging in past this limit evicts the least-recently-active session —
    * see `IssueSession` in `@verixa/sessions`.
