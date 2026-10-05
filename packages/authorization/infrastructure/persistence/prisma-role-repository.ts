@@ -3,7 +3,7 @@ import { Result } from "@verixa/shared-kernel";
 import type { RoleRepository } from "../../application/ports/role-repository.js";
 import { Role, type RoleId } from "../../domain/entities/role.js";
 import { Permission } from "../../domain/value-objects/permission.js";
-import { mapPrismaError } from "@verixa/identity/infrastructure/persistence/error-mapper.js";
+import { mapPrismaError } from "./error-mapper.js";
 
 export class PrismaRoleRepository implements RoleRepository {
   constructor(private readonly prisma: PrismaClient)

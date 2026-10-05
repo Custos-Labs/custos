@@ -2,7 +2,7 @@ import type { PrismaClient } from "@verixa/database";
 import type { UserRoleAssignmentRepository } from "../../application/ports/user-role-assignment-repository.js";
 import { UserRoleAssignment, type UserRoleAssignmentId } from "../../domain/entities/user-role-assignment.js";
 import type { RoleId } from "../../domain/entities/role.js";
-import { mapPrismaError } from "@verixa/identity/infrastructure/persistence/error-mapper.js";
+import { mapPrismaError } from "./error-mapper.js";
 
 export class PrismaUserRoleAssignmentRepository implements UserRoleAssignmentRepository {
   constructor(private readonly prisma: PrismaClient) {}
