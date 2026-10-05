@@ -10,6 +10,15 @@ import {
   type AuditDelegate,
   type AuditTransaction,
 } from "@verixa/audit";
+import type {
+  AttributeContext,
+  CombiningAlgorithm,
+  Decision,
+  LintResult,
+  PolicySet,
+  Rule,
+} from "@verixa/authorization";
+import { combine, DEFAULT_COMBINING_ALGORITHM, lintPolicySet } from "@verixa/authorization";
 import { PrismaAuthorizationRepository, type AuthorizationRepository } from "@verixa/authorization";
 import { loadConfig } from "@verixa/config";
 import {
@@ -237,6 +246,32 @@ export interface AuditUseCases {
   readonly anchor: AnchorAuditLog | undefined;
 }
 
+/**
+ * The Phase 08 ABAC pieces built so far: the deterministic evaluation engine
+ * (Issue 146), the combining algorithms (Issue 148), and the policy linter
+ * (Issue 156). All three are pure, side-effect-free functions in
+ * `@verixa/authorization`, so "wiring" them is exposing them under the
+ * container's configured default rather than assembling any adapters — there
+ * are none to assemble.
+ *
+ * This deliberately does **not** include `AuthorizeAction`, `SimulatePolicy`,
+ * a policy repository, or attribute providers (Issue 157's other named
+ * deliverables). Those depend on issues that don't exist yet in this
+ * codebase (roadmap 150, 153, 154 — a `PolicyRepository` and the attribute
+ * providers Issue 157 assumes are already wired), and Phase 07's RBAC
+ * (Issues 121-140, including `packages/authorization` itself) hasn't been
+ * built either. Issue 157 says to check with a maintainer when a dependency
+ * is still open and, failing that, "you may be able to proceed against the
+ * interface alone" — wiring the deterministic core that exists today, ahead
+ * of the parts that don't, is that call. `PolicyRepository`,
+ * `AuthorizeAction` and `SimulatePolicy` belong here once their own issues
+ * land; extending this interface then is a compatible, additive change.
+ */
+export interface AuthorizationServices {
+  readonly combiningAlgorithm: CombiningAlgorithm;
+  /** Evaluates a rule set against a request using the container's configured combining algorithm. */
+  readonly evaluateRequest: (rules: readonly Rule[], context: AttributeContext) => Decision;
+  readonly lintPolicySet: (policySet: PolicySet) => LintResult;
 /** Multi-factor authentication use cases. */
 export interface MfaUseCases {
   readonly registerWebAuthnCredential: RegisterWebAuthnCredential;
@@ -249,6 +284,7 @@ export interface Container {
   readonly identity: IdentityUseCases;
   readonly credentials: CredentialUseCases;
   readonly audit: AuditUseCases;
+  readonly authorization: AuthorizationServices;
   readonly authorization: AuthorizationRepository;
   /**
    * Drains any queued audit writes, then releases the database connection.
@@ -476,6 +512,10 @@ export function buildContainer(
           ? undefined
           : new AnchorAuditLog(auditLog, anchorRecords, hashAnchor),
     },
+    authorization: {
+      combiningAlgorithm: DEFAULT_COMBINING_ALGORITHM,
+      evaluateRequest: (rules, context) => combine(DEFAULT_COMBINING_ALGORITHM, rules, context),
+      lintPolicySet,
     authorization,
     mfa: {
       registerWebAuthnCredential,
