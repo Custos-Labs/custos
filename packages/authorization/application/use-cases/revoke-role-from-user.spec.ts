@@ -12,7 +12,7 @@ describe("RevokeRoleFromUser", () => {
 
   const targetUserId = asId<"UserId">("user_target");
   const roleId = asId<"RoleId">("role_admin");
-  const orgId = asId<"OrgId">("org_cyberdyne");
+  const orgId = asId<"OrganizationId">("org_cyberdyne");
   const assignedBy = asId<"UserId">("user_admin");
 
   let seededAssignment: UserRoleAssignment;

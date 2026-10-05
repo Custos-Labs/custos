@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  emptyAttributeContext,
+  type AuthorizationRequest,
+} from "../../domain/attribute-context.js";
+import {
   AUTHORIZATION_PRECEDENCE,
   AUTHORIZATION_REASONS,
   UnsafeAuthorizationPrecedenceError,
   assertAuthorizationPrecedenceIsSafe,
   resolveAuthorizationPrecedence,
 } from "../../domain/authorization-decision.js";
-import {
-  emptyAttributeContext,
-  type AuthorizationRequest,
-} from "../../domain/attribute-context.js";
 import type { PolicyDecisionPoint, PolicyEvaluation } from "../ports/policy-decision-point.js";
 import type { RoleDecision, RolePermissionGate } from "../ports/role-permission-gate.js";
+
 import { AuthorizationService } from "./authorization-service.js";
 
 const REQUEST: AuthorizationRequest = {
@@ -31,12 +32,12 @@ class RecordingRolePermissionGate implements RolePermissionGate {
 
   constructor(private readonly outcome: RoleDecision | Error) {}
 
-  async check(request: unknown): Promise<RoleDecision> {
+  check(request: unknown): Promise<RoleDecision> {
     this.requests.push(request);
     if (this.outcome instanceof Error) {
-      throw this.outcome;
+      return Promise.reject(this.outcome);
     }
-    return this.outcome;
+    return Promise.resolve(this.outcome);
   }
 }
 
@@ -46,12 +47,12 @@ class RecordingPolicyDecisionPoint implements PolicyDecisionPoint {
 
   constructor(private readonly outcome: PolicyEvaluation | Error) {}
 
-  async evaluate(request: AuthorizationRequest): Promise<PolicyEvaluation> {
+  evaluate(request: AuthorizationRequest): Promise<PolicyEvaluation> {
     this.requests.push(request);
     if (this.outcome instanceof Error) {
-      throw this.outcome;
+      return Promise.reject(this.outcome);
     }
-    return this.outcome;
+    return Promise.resolve(this.outcome);
   }
 }
 

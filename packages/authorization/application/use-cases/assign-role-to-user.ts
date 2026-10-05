@@ -46,17 +46,9 @@ export class AssignRoleToUser {
       return Result.err(new NotFoundError(`Role with ID "${command.roleId}" was not found.`));
     }
 
-    // 2. Enforce scope compatibility
-    if (role.isScoped()) {
-      if (command.orgId !== role.orgId) {
-        return Result.err(
-          new ValidationError(
-            `Scoped role "${role.name}" belongs to organization "${role.orgId}" and cannot be assigned to scope "${command.orgId}".`,
-            { orgId: ["scope_mismatch"] },
-          ),
-        );
-      }
-    }
+    // 2. No scope compatibility check: roles are global, so any role may be
+    // assigned within any organization. The scope lives on the assignment, which
+    // is what `command.orgId` sets.
 
     // 3. Check for existing active assignment to ensure idempotency
     if (command.orgId !== undefined) {

@@ -14,10 +14,10 @@ describe("AssignRoleToUser", () => {
 
   const actorId = asId<"UserId">("user_admin");
   const targetUserId = asId<"UserId">("user_target");
-  const orgId = asId<"OrgId">("org_cyberdyne");
+  const orgId = asId<"OrganizationId">("org_cyberdyne");
 
   let globalAdminRole: Role;
-  let scopedEditorRole: Role;
+  let editorRole: Role;
 
   beforeEach(async () => {
     roleRepo = new InMemoryRoleRepository();
@@ -36,12 +36,11 @@ describe("AssignRoleToUser", () => {
 
     const editorRes = Role.create({
       name: "editor",
-      orgId,
       permissions: ["content:write"],
     });
     if (Result.isOk(editorRes)) {
-      scopedEditorRole = editorRes.value;
-      await roleRepo.save(scopedEditorRole);
+      editorRole = editorRes.value;
+      await roleRepo.save(editorRole);
     }
   });
 
@@ -68,7 +67,7 @@ describe("AssignRoleToUser", () => {
   it("successfully assigns an organization-scoped role to a user", async () => {
     const result = await assignRoleToUser.execute({
       userId: targetUserId,
-      roleId: scopedEditorRole.id,
+      roleId: editorRole.id,
       orgId,
       assignedBy: actorId,
     });
@@ -76,12 +75,12 @@ describe("AssignRoleToUser", () => {
     expect(Result.isOk(result)).toBe(true);
     if (Result.isOk(result)) {
       expect(result.value.userId).toBe(targetUserId);
-      expect(result.value.roleId).toBe(scopedEditorRole.id);
+      expect(result.value.roleId).toBe(editorRole.id);
       expect(result.value.orgId).toBe(orgId);
 
       const assignments = await assignmentRepo.findByUserAndOrg(targetUserId, orgId);
       expect(assignments).toHaveLength(1);
-      expect(assignments[0]?.roleId).toBe(scopedEditorRole.id);
+      expect(assignments[0]?.roleId).toBe(editorRole.id);
     }
   });
 
@@ -89,7 +88,7 @@ describe("AssignRoleToUser", () => {
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour later
     const result = await assignRoleToUser.execute({
       userId: targetUserId,
-      roleId: scopedEditorRole.id,
+      roleId: editorRole.id,
       orgId,
       assignedBy: actorId,
       expiresAt,
@@ -104,7 +103,7 @@ describe("AssignRoleToUser", () => {
   it("returns existing assignment idempotently when already assigned and active", async () => {
     const first = await assignRoleToUser.execute({
       userId: targetUserId,
-      roleId: scopedEditorRole.id,
+      roleId: editorRole.id,
       orgId,
       assignedBy: actorId,
     });
@@ -112,7 +111,7 @@ describe("AssignRoleToUser", () => {
 
     const second = await assignRoleToUser.execute({
       userId: targetUserId,
-      roleId: scopedEditorRole.id,
+      roleId: editorRole.id,
       orgId,
       assignedBy: actorId,
     });
@@ -142,35 +141,19 @@ describe("AssignRoleToUser", () => {
     }
   });
 
-  it("fails if attempting to assign an organization-scoped role to another organization", async () => {
-    const anotherOrgId = asId<"OrgId">("org_other");
+  it("allows assigning the same role within different organizations, since roles are global", async () => {
+    // Roles carry no scope of their own now -- `model Role` has no
+    // `organization_id` -- so the same role may be assigned in any
+    // organization. The scope lives entirely on the assignment.
+    const anotherOrgId = asId<"OrganizationId">("org_other");
     const result = await assignRoleToUser.execute({
       userId: targetUserId,
-      roleId: scopedEditorRole.id,
+      roleId: editorRole.id,
       orgId: anotherOrgId,
       assignedBy: actorId,
     });
 
-    expect(Result.isErr(result)).toBe(true);
-    if (Result.isErr(result)) {
-      expect(result.error.code).toBe("VALIDATION_ERROR");
-      expect(result.error.message).toContain("cannot be assigned to scope");
-    }
-  });
-
-  it("fails if attempting to assign an organization-scoped role globally", async () => {
-    const result = await assignRoleToUser.execute({
-      userId: targetUserId,
-      roleId: scopedEditorRole.id,
-      orgId: null,
-      assignedBy: actorId,
-    });
-
-    expect(Result.isErr(result)).toBe(true);
-    if (Result.isErr(result)) {
-      expect(result.error.code).toBe("VALIDATION_ERROR");
-      expect(result.error.message).toContain("cannot be assigned to scope");
-    }
+    expect(Result.isOk(result)).toBe(true);
   });
 
   it("fails when validation invariants are violated (e.g. invalid expiry)", async () => {

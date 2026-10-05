@@ -59,5 +59,11 @@ export async function startTestRedis(): Promise<TestRedis | undefined> {
     return undefined;
   }
 
-  return { client, stop: async () => client.disconnect() };
+  return {
+    client,
+    stop: () => {
+      client.disconnect();
+      return Promise.resolve();
+    },
+  };
 }

@@ -3,7 +3,17 @@ import { createId, type Id, Result, ValidationError } from "@verixa/shared-kerne
 export type UserRoleAssignmentId = Id<"UserRoleAssignmentId">;
 export type UserId = Id<"UserId">;
 export type RoleId = Id<"RoleId">;
-export type OrgId = Id<"OrgId">;
+/**
+ * An organization id.
+ *
+ * Branded `"OrganizationId"`, matching `packages/identity`'s
+ * `OrganizationId`, not `"OrgId"`. Both spellings were declared here at once
+ * after a merge, and the difference is not cosmetic: branded types are nominal,
+ * so an `Id<"OrgId">` and an `Id<"OrganizationId">` are not assignable to each
+ * other, and an organization id coming from the identity context could not be
+ * passed to anything here. The short local name is kept because this package
+ * uses it throughout.
+ */
 export type OrgId = Id<"OrganizationId">;
 
 export interface UserRoleAssignmentProps {

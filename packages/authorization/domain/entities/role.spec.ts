@@ -1,4 +1,4 @@
-import { asId, Result, ValidationError } from "@verixa/shared-kernel";
+import { Result, ValidationError } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
 import { SystemRoleImmutableError } from "../errors/system-role-immutable-error.js";
@@ -29,31 +29,10 @@ describe("Role aggregate", () => {
       expect(role.name).toBe("accountant");
       expect(role.description).toBe("Access to invoices and financial ledgers");
       expect(role.isSystemRole).toBe(false);
-      expect(role.orgId).toBeNull();
-      expect(role.isGlobal()).toBe(true);
-      expect(role.isScoped()).toBe(false);
       expect(role.permissions.size).toBe(2);
       expect(role.hasPermission("invoices:read")).toBe(true);
       expect(role.hasPermission("invoices:write")).toBe(true);
       expect(role.hasPermission("users:read")).toBe(false);
-    });
-
-    it("creates an organization-scoped role via createScoped", () => {
-      const orgId = asId<"OrgId">("org_456");
-      const result = Role.createScoped({
-        name: "custom-reviewer",
-        orgId,
-        permissions: ["content:review"],
-      });
-
-      expect(Result.isOk(result)).toBe(true);
-      if (!Result.isOk(result)) return;
-
-      const role = result.value;
-      expect(role.name).toBe("custom-reviewer");
-      expect(role.orgId).toBe("org_456");
-      expect(role.isGlobal()).toBe(false);
-      expect(role.isScoped()).toBe(true);
     });
 
     it("creates a protected system role via createSystemRole", () => {
@@ -69,9 +48,6 @@ describe("Role aggregate", () => {
       const role = result.value;
       expect(role.name).toBe("super-admin");
       expect(role.isSystemRole).toBe(true);
-      expect(role.orgId).toBeNull();
-      expect(role.isGlobal()).toBe(true);
-      expect(role.isScoped()).toBe(false);
       expect(role.hasPermission("users:delete")).toBe(true);
       expect(role.hasPermission("roles:manage")).toBe(true);
     });
