@@ -104,9 +104,6 @@ export { PermissionMatcher } from "./domain/services/permission-matcher.js";
 export { InMemoryPermissionRepository } from "./infrastructure/fakes/in-memory-permission-repository.js";
 export { InMemoryRoleRepository } from "./infrastructure/fakes/in-memory-role-repository.js";
 export { InMemoryUserRoleAssignmentRepository } from "./infrastructure/fakes/in-memory-user-role-assignment-repository.js";
-export { permissionRepositoryContract } from "./infrastructure/testing/contracts/permission-repository.contract.js";
-export { roleRepositoryContract } from "./infrastructure/testing/contracts/role-repository.contract.js";
-export { userRoleAssignmentRepositoryContract } from "./infrastructure/testing/contracts/user-role-assignment-repository.contract.js";
 export { UserRoleAssignment } from "./domain/entities/user-role-assignment.js";
 export type {
   CreateUserRoleAssignmentParams,
