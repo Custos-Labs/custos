@@ -5,4 +5,11 @@
     "rootDir": "."
   },
   "include": ["index.ts", "domain/**/*", "application/**/*", "infrastructure/**/*"]
+  "include": [
+    "index.ts",
+    "domain/**/*",
+    "application/**/*",
+    "infrastructure/**/*",
+    "interface/**/*"
+  ]
 }

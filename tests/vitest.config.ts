@@ -7,6 +7,10 @@ import baseConfig from "../vitest.config.js";
 const packageEntry = (name: string): string =>
   fileURLToPath(new URL(`../packages/${name}/index.ts`, import.meta.url));
 
+/** A named entry point of a workspace package, resolved to its source. */
+const packageSubpath = (name: string, entry: string): string =>
+  fileURLToPath(new URL(`../packages/${name}/${entry}.ts`, import.meta.url));
+
 export default mergeConfig(
   baseConfig,
   defineConfig({
@@ -34,6 +38,10 @@ export default mergeConfig(
      */
     resolve: {
       alias: {
+        // Listed before the bare specifier: Vite matches aliases in order, and
+        // a `@verixa/audit` entry would otherwise swallow the subpath and then
+        // fail to resolve `/testing` against a file path.
+        "@verixa/audit/testing": packageSubpath("audit", "testing"),
         "@verixa/audit": packageEntry("audit"),
         "@verixa/stellar-anchor": packageEntry("stellar-anchor"),
       },

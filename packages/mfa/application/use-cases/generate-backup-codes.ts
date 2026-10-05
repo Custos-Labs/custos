@@ -1,8 +1,12 @@
 import { Result } from "@verixa/shared-kernel";
-import { BackupCodeSet, type BackupCodeGenerationResult } from "../../domain/services/backup-code-set.js";
+
 import { MfaMethod, type UserId } from "../../domain/entities/mfa-method.js";
-import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
+import {
+  BackupCodeSet,
+  type BackupCodeGenerationResult,
+} from "../../domain/services/backup-code-set.js";
 import type { AuditLogger } from "../ports/audit-logger.js";
+import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 
 export interface GenerateBackupCodesCommand {
   readonly userId: string;
@@ -13,7 +17,7 @@ export type GenerateBackupCodesResult = Result<BackupCodeGenerationResult, Error
 export class GenerateBackupCodes {
   constructor(
     private readonly mfaMethodRepository: MfaMethodRepository,
-    private readonly auditLogger: AuditLogger
+    private readonly auditLogger: AuditLogger,
   ) {}
 
   async execute(command: GenerateBackupCodesCommand): Promise<GenerateBackupCodesResult> {
@@ -23,7 +27,7 @@ export class GenerateBackupCodes {
 
     const active = await this.mfaMethodRepository.findActiveByUserId(userId);
     const pending = await this.mfaMethodRepository.findPendingByUserId(userId);
-    const existing = [...active, ...pending].filter(m => m.type === "backup_codes");
+    const existing = [...active, ...pending].filter((m) => m.type === "backup_codes");
 
     for (const method of existing) {
       await this.mfaMethodRepository.delete(method.id);
@@ -35,7 +39,9 @@ export class GenerateBackupCodes {
 
     await this.mfaMethodRepository.save(newMethod);
 
-    await this.auditLogger.record("backup_codes.generated", userId, { count: generationResult.hashedCodes.length.toString() });
+    await this.auditLogger.record("backup_codes.generated", userId, {
+      count: generationResult.hashedCodes.length.toString(),
+    });
 
     return Result.ok(generationResult);
   }
