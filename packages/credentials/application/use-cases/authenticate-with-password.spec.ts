@@ -1,13 +1,36 @@
 import { Email, type User } from "@verixa/identity";
+import type { MfaEnforcementLevel } from "@verixa/mfa";
 import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
 import { InMemoryCredentialsUnitOfWork } from "../../infrastructure/testing/in-memory-credentials-unit-of-work.js";
 import type { PasswordHasher } from "../ports/password-hasher.js";
 
-import { AuthenticateWithPassword } from "./authenticate-with-password.js";
+import {
+  AuthenticateWithPassword,
+  type AuthenticateWithPasswordSuccessResult,
+} from "./authenticate-with-password.js";
 import { RegisterUserWithPassword } from "./register-user-with-password.js";
+
+/**
+ * Narrows the success union to the plain (no-MFA-challenge) branch.
+ *
+ * `execute()`'s success type covers three shapes -- a plain login, an MFA
+ * challenge, and an enrollment prompt -- so `.value.user`/`.value.rehashed`
+ * do not exist on the type without first ruling out the other two. Every
+ * caller here either passes no `mfaChecker` or configures one that reports no
+ * active methods and an `optional`/`disabled` policy, so the plain branch is
+ * the only one these tests can ever actually observe; this makes that
+ * assumption explicit instead of asserting past it with a cast.
+ */
+function expectPlainLogin(
+  value: AuthenticateWithPasswordSuccessResult,
+): value is { readonly user: User; readonly rehashed: boolean; readonly status?: undefined } {
+  expect(value.status).toBeUndefined();
+  return value.status === undefined;
+}
 
 // Weak parameters, for the same reason the registration spec uses them: these
 // tests exercise orchestration and disclosure, not hashing strength. The
@@ -46,6 +69,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.user.email.value).toBe(EMAIL);
     });
 
@@ -69,47 +93,49 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.user.status).toBe("pending");
     });
 
     it("logs in unchanged when no MFA and optional/disabled policy", async () => {
       const mfaChecker = {
-        resolvePolicy: async () => "optional" as const,
-        listActiveMethods: async () => [],
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
+        listActiveMethods: () => Promise.resolve([]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, undefined, mfaChecker);
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
-      expect((result.value as any).status).toBeUndefined();
+      expect(result.value.status).toBeUndefined();
     });
 
     it("always issues a challenge when user has active methods", async () => {
       const mfaChecker = {
-        resolvePolicy: async () => "optional" as const,
-        listActiveMethods: async () => [{ id: "m1", type: "totp" }],
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
+        listActiveMethods: () => Promise.resolve([{ id: "m1", type: "totp" }]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, undefined, mfaChecker);
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
-      expect((result.value as any).status).toBe("mfa_challenge");
-      expect((result.value as any).methods).toHaveLength(1);
+      expect(result.value.status).toBe("mfa_challenge");
+      if (result.value.status !== "mfa_challenge") return;
+      expect(result.value.methods).toHaveLength(1);
     });
 
     it("routes required-but-unenrolled users to enrollment and never grants a session", async () => {
       const mfaChecker = {
-        resolvePolicy: async () => "required" as const,
-        listActiveMethods: async () => [],
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("required"),
+        listActiveMethods: () => Promise.resolve([]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, undefined, mfaChecker);
+      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
-      expect((result.value as any).status).toBe("enrollment_required");
+      expect(result.value.status).toBe("enrollment_required");
     });
   });
 
@@ -259,6 +285,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(true);
 
       const after = await unitOfWork.repositories.credentials.findByUserId(result.value.user.id);
@@ -274,6 +301,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(false);
     });
 
@@ -302,6 +330,7 @@ describe("AuthenticateWithPassword", () => {
 
       expect(Result.isOk(result)).toBe(true);
       if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
       expect(result.value.rehashed).toBe(false);
     });
   });

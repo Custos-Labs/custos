@@ -173,6 +173,23 @@ export function registerAuthRoutes<TLogger extends FastifyBaseLogger>(
           return;
         }
 
+        // `authenticateWithPassword` is constructed below without an
+        // `mfaChecker` (that wiring is a later issue), so `result.value` can
+        // only ever be the plain login shape at runtime -- the MFA-challenge
+        // and enrollment-required branches of the union are presently
+        // unreachable here. Narrowed explicitly anyway, rather than asserted
+        // past, so this route starts failing loudly instead of silently if a
+        // future change wires an `mfaChecker` in without updating it.
+        if (result.value.status !== undefined) {
+          reply.log.error(
+            { status: result.value.status },
+            "AuthenticateWithPassword returned an MFA-flow result, but /auth/login does not " +
+              "yet handle one.",
+          );
+          await reply.status(501).send({ error: "mfa_not_yet_supported" });
+          return;
+        }
+
         // No session or token yet — that is Phase 05. Until then this returns
         // the authenticated user and nothing else, which is deliberately not
         // enough to stay logged in with. Returning a placeholder token would

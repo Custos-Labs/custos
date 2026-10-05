@@ -1,9 +1,9 @@
 import { Email, type User, type UserStatus } from "@verixa/identity";
+import type { MfaEnforcementLevel } from "@verixa/mfa";
 import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
 import type { RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
 
 import type { Credential } from "../../domain/entities/credential.js";
-import type { MfaPolicy } from "@verixa/mfa";
 import {
   DEFAULT_LOCKOUT_POLICY,
   type LockoutPolicy,
@@ -41,7 +41,7 @@ export interface AuthenticateWithPasswordResult {
 export type AuthenticateWithPasswordError = AuthenticationError | AccountLockedError;
 
 export interface MfaChecker {
-  resolvePolicy(userId: string): Promise<MfaPolicy>;
+  resolvePolicy(userId: string): Promise<MfaEnforcementLevel>;
   listActiveMethods(userId: string): Promise<readonly { readonly id: string; readonly type: string }[]>;
 }
 
@@ -163,7 +163,7 @@ export class AuthenticateWithPassword {
 
   async execute(
     command: AuthenticateWithPasswordCommand,
-  ): Promise<Result<AuthenticateWithPasswordResult, AuthenticateWithPasswordError>> {
+  ): Promise<Result<AuthenticateWithPasswordSuccessResult, AuthenticateWithPasswordError>> {
     // 1. Check rate limit BEFORE any other logic
     const rateLimitKey: RateLimitKey = {
       action: "login",
@@ -324,7 +324,7 @@ export class AuthenticateWithPassword {
           rehashed,
           status: "enrollment_required",
           userId: verified.user.id,
-        } as unknown as AuthenticateWithPasswordResult);
+        });
       }
 
       if (policy === "required" || (policy === "optional" && activeMethods.length > 0) || activeMethods.length > 0) {
@@ -335,14 +335,14 @@ export class AuthenticateWithPassword {
             status: "mfa_challenge",
             userId: verified.user.id,
             methods: activeMethods,
-          } as unknown as AuthenticateWithPasswordResult);
+          });
         } else if (policy === "required") {
           return Result.ok({
             user: verified.user,
             rehashed,
             status: "enrollment_required",
             userId: verified.user.id,
-          } as unknown as AuthenticateWithPasswordResult);
+          });
         }
       }
     }
