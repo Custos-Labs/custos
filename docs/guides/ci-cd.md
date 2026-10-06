@@ -2,7 +2,7 @@
 
 ## Continuous Integration
 
-`.github/workflows/ci.yml` runs on every push to `master` and every pull
+`.github/workflows/ci.yml` runs on every push to `main` and every pull
 request: install → build → lint → format check → typecheck → test.
 
 It intentionally runs the _exact same commands_ a contributor runs locally

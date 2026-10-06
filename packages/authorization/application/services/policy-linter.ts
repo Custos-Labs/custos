@@ -1,5 +1,5 @@
 import type { Rule, PolicySet } from "../../domain/entities/rule.js";
-import type { AttributeCondition, Condition } from "../../domain/value-objects/condition.js";
+import type { ComparisonCondition, Condition } from "../../domain/value-objects/condition.js";
 
 /**
  * One flattened equality/inequality constraint pulled out of a rule's
@@ -37,13 +37,13 @@ interface Constraint {
  * linter never asserts a conflict or a shadow it cannot actually prove.
  */
 function extractConstraints(condition: Condition): readonly Constraint[] | null {
-  if (condition.type === "attribute") {
+  if (condition.kind === "comparison") {
     return extractLeafConstraint(condition);
   }
 
-  if (condition.type === "and") {
+  if (condition.kind === "and") {
     const constraints: Constraint[] = [];
-    for (const child of condition.conditions) {
+    for (const child of condition.operands) {
       const childConstraints = extractConstraints(child);
       if (childConstraints === null) return null;
       constraints.push(...childConstraints);
@@ -51,14 +51,29 @@ function extractConstraints(condition: Condition): readonly Constraint[] | null 
     return constraints;
   }
 
-  // `OR` and `NOT` conditions are not conjunctions and are deliberately left
-  // unanalyzed.
+  // `always`, `or`, and `not` conditions are not conjunctions of equality
+  // comparisons and are deliberately left unanalyzed. `always` in particular
+  // is not a missing case: a rule that always matches is exactly as broad as
+  // a conjunction of zero constraints would be, but representing that as
+  // `[]` here would make it compatible with (and implied by) everything,
+  // which is correct for `implies` but wrong for `overlaps` -- an `always`
+  // DENY and *any* PERMIT rule do overlap, which is worth a finding, not a
+  // silent pass. Treating it as unanalyzed is the conservative choice this
+  // linter makes everywhere else it cannot prove something cheaply.
   return null;
 }
 
-function extractLeafConstraint(condition: AttributeCondition): readonly Constraint[] | null {
-  if (condition.operator !== "equals" && condition.operator !== "notEquals") return null;
-  return [{ attribute: condition.attribute, operator: condition.operator, value: condition.value }];
+/**
+ * The comparison operators this linter understands as equality or its
+ * negation. `Condition`'s `ComparisonOperator` has others (`lt`, `in`,
+ * `contains`, ...); a leaf using any of those is left unanalyzed for the same
+ * reason `OR` and `NOT` are -- `implies`/`overlaps` below only know how to
+ * reason about equals/not-equals.
+ */
+function extractLeafConstraint(condition: ComparisonCondition): readonly Constraint[] | null {
+  if (condition.operator !== "eq" && condition.operator !== "neq") return null;
+  const operator = condition.operator === "eq" ? "equals" : "notEquals";
+  return [{ attribute: condition.attribute, operator, value: condition.value }];
 }
 
 /**

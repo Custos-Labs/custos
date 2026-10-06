@@ -39,9 +39,7 @@ export interface SessionIssuerCommand {
 }
 
 export type ConsumeMfaChallengeError =
-  | "CHALLENGE_NOT_FOUND"
-  | "CHALLENGE_EXPIRED"
-  | "CHALLENGE_ALREADY_CONSUMED";
+  "CHALLENGE_NOT_FOUND" | "CHALLENGE_EXPIRED" | "CHALLENGE_ALREADY_CONSUMED";
 
 export interface ConsumeMfaChallengeCommand {
   readonly challengeId: MfaChallengeId;

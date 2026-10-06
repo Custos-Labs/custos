@@ -42,7 +42,9 @@ export type AuthenticateWithPasswordError = AuthenticationError | AccountLockedE
 
 export interface MfaChecker {
   resolvePolicy(userId: string): Promise<MfaEnforcementLevel>;
-  listActiveMethods(userId: string): Promise<readonly { readonly id: string; readonly type: string }[]>;
+  listActiveMethods(
+    userId: string,
+  ): Promise<readonly { readonly id: string; readonly type: string }[]>;
 }
 
 /**
@@ -327,7 +329,11 @@ export class AuthenticateWithPassword {
         });
       }
 
-      if (policy === "required" || (policy === "optional" && activeMethods.length > 0) || activeMethods.length > 0) {
+      if (
+        policy === "required" ||
+        (policy === "optional" && activeMethods.length > 0) ||
+        activeMethods.length > 0
+      ) {
         if (activeMethods.length > 0) {
           return Result.ok({
             user: verified.user,

@@ -12,12 +12,12 @@ describe("lintPolicySet — conflicts", () => {
         {
           id: "permit-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "deny-admin",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -37,13 +37,13 @@ describe("lintPolicySet — conflicts", () => {
           id: "permit-admin",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
               {
-                type: "attribute",
+                kind: "comparison",
                 attribute: "resourceType",
-                operator: "equals",
+                operator: "eq",
                 value: "invoice",
               },
             ],
@@ -53,10 +53,10 @@ describe("lintPolicySet — conflicts", () => {
           id: "deny-locked",
           effect: "DENY",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-              { type: "attribute", attribute: "locked", operator: "equals", value: true },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+              { kind: "comparison", attribute: "locked", operator: "eq", value: true },
             ],
           },
         },
@@ -76,12 +76,12 @@ describe("lintPolicySet — conflicts", () => {
         {
           id: "permit-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "permit-admin-again",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -97,12 +97,12 @@ describe("lintPolicySet — conflicts", () => {
         {
           id: "permit-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "deny-member",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "member" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "member" },
         },
       ],
     };
@@ -121,9 +121,9 @@ describe("lintPolicySet — notEquals overlap semantics", () => {
           id: "permit-not-banned",
           effect: "PERMIT",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "role",
-            operator: "notEquals",
+            operator: "neq",
             value: "banned",
           },
         },
@@ -131,9 +131,9 @@ describe("lintPolicySet — notEquals overlap semantics", () => {
           id: "deny-not-admin",
           effect: "DENY",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "role",
-            operator: "notEquals",
+            operator: "neq",
             value: "admin",
           },
         },
@@ -158,15 +158,15 @@ describe("lintPolicySet — notEquals overlap semantics", () => {
         {
           id: "permit-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "deny-not-admin",
           effect: "DENY",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "role",
-            operator: "notEquals",
+            operator: "neq",
             value: "admin",
           },
         },
@@ -185,15 +185,15 @@ describe("lintPolicySet — notEquals overlap semantics", () => {
         {
           id: "permit-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "deny-not-member",
           effect: "DENY",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "role",
-            operator: "notEquals",
+            operator: "neq",
             value: "member",
           },
         },
@@ -217,16 +217,16 @@ describe("lintPolicySet — shadowing", () => {
         {
           id: "allow-all-admins",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "allow-admins-in-org",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-              { type: "attribute", attribute: "orgId", operator: "equals", value: "org-1" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+              { kind: "comparison", attribute: "orgId", operator: "eq", value: "org-1" },
             ],
           },
         },
@@ -243,11 +243,11 @@ describe("lintPolicySet — shadowing", () => {
     const policySet: PolicySet = {
       id: "ps6",
       rules: [
-        { id: "match-everything", effect: "DENY", condition: { type: "and", conditions: [] } },
+        { id: "match-everything", effect: "DENY", condition: { kind: "and", operands: [] } },
         {
           id: "allow-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -266,17 +266,17 @@ describe("lintPolicySet — shadowing", () => {
           id: "allow-admins-in-org",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-              { type: "attribute", attribute: "orgId", operator: "equals", value: "org-1" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+              { kind: "comparison", attribute: "orgId", operator: "eq", value: "org-1" },
             ],
           },
         },
         {
           id: "allow-all-admins",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -292,12 +292,12 @@ describe("lintPolicySet — shadowing", () => {
         {
           id: "allow-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "allow-member",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "member" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "member" },
         },
       ],
     };
@@ -315,17 +315,17 @@ describe("lintPolicySet — unanalyzable conditions", () => {
           id: "permit-admin-or-owner",
           effect: "PERMIT",
           condition: {
-            type: "or",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-              { type: "attribute", attribute: "role", operator: "equals", value: "owner" },
+            kind: "or",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+              { kind: "comparison", attribute: "role", operator: "eq", value: "owner" },
             ],
           },
         },
         {
           id: "deny-admin",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -343,14 +343,14 @@ describe("lintPolicySet — unanalyzable conditions", () => {
           id: "permit-not-locked",
           effect: "PERMIT",
           condition: {
-            type: "not",
-            condition: { type: "attribute", attribute: "locked", operator: "equals", value: true },
+            kind: "not",
+            operand: { kind: "comparison", attribute: "locked", operator: "eq", value: true },
           },
         },
         {
           id: "deny-locked",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "locked", operator: "equals", value: true },
+          condition: { kind: "comparison", attribute: "locked", operator: "eq", value: true },
         },
       ],
     };
@@ -368,9 +368,9 @@ describe("lintPolicySet — unanalyzable conditions", () => {
           id: "permit-elevated",
           effect: "PERMIT",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "riskScore",
-            operator: "greaterThan",
+            operator: "gt",
             value: 50,
           },
         },
@@ -378,9 +378,9 @@ describe("lintPolicySet — unanalyzable conditions", () => {
           id: "deny-elevated",
           effect: "DENY",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "riskScore",
-            operator: "greaterThan",
+            operator: "gt",
             value: 50,
           },
         },
@@ -400,23 +400,23 @@ describe("lintPolicySet — unanalyzable conditions", () => {
           id: "permit-admin-or-owner-in-org",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
+            kind: "and",
+            operands: [
               {
-                type: "or",
-                conditions: [
-                  { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-                  { type: "attribute", attribute: "role", operator: "equals", value: "owner" },
+                kind: "or",
+                operands: [
+                  { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+                  { kind: "comparison", attribute: "role", operator: "eq", value: "owner" },
                 ],
               },
-              { type: "attribute", attribute: "orgId", operator: "equals", value: "org-1" },
+              { kind: "comparison", attribute: "orgId", operator: "eq", value: "org-1" },
             ],
           },
         },
         {
           id: "deny-admin",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };
@@ -433,12 +433,12 @@ describe("lintPolicySet — unanalyzable conditions", () => {
         {
           id: "allow-admin",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         {
           id: "deny-member",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "member" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "member" },
         },
       ],
     };
@@ -456,19 +456,19 @@ describe("lintPolicySet — a known-good fixture set", () => {
           id: "allow-org-admin",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
               {
-                type: "attribute",
+                kind: "comparison",
                 attribute: "resourceType",
-                operator: "equals",
+                operator: "eq",
                 value: "invoice",
               },
               {
-                type: "attribute",
+                kind: "comparison",
                 attribute: "accountStatus",
-                operator: "equals",
+                operator: "eq",
                 value: "active",
               },
             ],
@@ -478,14 +478,14 @@ describe("lintPolicySet — a known-good fixture set", () => {
           id: "allow-org-viewer-read",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "viewer" },
-              { type: "attribute", attribute: "action", operator: "equals", value: "read" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "viewer" },
+              { kind: "comparison", attribute: "action", operator: "eq", value: "read" },
               {
-                type: "attribute",
+                kind: "comparison",
                 attribute: "accountStatus",
-                operator: "equals",
+                operator: "eq",
                 value: "active",
               },
             ],
@@ -503,9 +503,9 @@ describe("lintPolicySet — a known-good fixture set", () => {
           id: "deny-suspended",
           effect: "DENY",
           condition: {
-            type: "attribute",
+            kind: "comparison",
             attribute: "accountStatus",
-            operator: "equals",
+            operator: "eq",
             value: "suspended",
           },
         },
@@ -527,17 +527,17 @@ describe("lintPolicySet — a known-conflict fixture set", () => {
         {
           id: "allow-admin-broad",
           effect: "PERMIT",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
         // Unreachable given the rule above.
         {
           id: "allow-admin-narrow",
           effect: "PERMIT",
           condition: {
-            type: "and",
-            conditions: [
-              { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
-              { type: "attribute", attribute: "orgId", operator: "equals", value: "org-1" },
+            kind: "and",
+            operands: [
+              { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
+              { kind: "comparison", attribute: "orgId", operator: "eq", value: "org-1" },
             ],
           },
         },
@@ -545,7 +545,7 @@ describe("lintPolicySet — a known-conflict fixture set", () => {
         {
           id: "deny-admin",
           effect: "DENY",
-          condition: { type: "attribute", attribute: "role", operator: "equals", value: "admin" },
+          condition: { kind: "comparison", attribute: "role", operator: "eq", value: "admin" },
         },
       ],
     };

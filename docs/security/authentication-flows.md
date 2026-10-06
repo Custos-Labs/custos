@@ -370,6 +370,7 @@ Following successful password verification, `AuthenticateWithPassword` consults 
 ### Why decouple MFA from the credentials domain?
 
 The credentials bounded context must not depend on MFA internals. Using an interface port (`MfaChecker`) allows the login use case to orchestrate across contexts without the MFA package reaching backward into credential logic. An alternative considered was embedding MFA checks directly within the credential tables; that was rejected because it violates bounded context boundaries and prevents credential logic from remaining independently testable.
+
 ## Change Password (Credential Rotation)
 
 An authenticated user can change their own password by providing their current

@@ -95,6 +95,7 @@ and `encryption.spec.ts` holds the regression test.
 
 The package now builds, typechecks, lints with zero errors, and passes 90 tests
 at 95% statement coverage.
+
 ## Lifted: `packages/mfa` (2026-10-04)
 
 Released from quarantine. Kept as the worked example for the other two, because

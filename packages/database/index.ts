@@ -33,7 +33,6 @@ export const {
   PolicyLifecycleStatus,
   Prisma,
   PrismaClient,
-  SessionStatus,
   UserStatus,
   VerificationDecision,
   VerificationStatus,
@@ -57,8 +56,6 @@ export type OrganizationStatus =
   (typeof prismaRuntime.OrganizationStatus)[keyof typeof prismaRuntime.OrganizationStatus];
 export type PolicyLifecycleStatus =
   (typeof prismaRuntime.PolicyLifecycleStatus)[keyof typeof prismaRuntime.PolicyLifecycleStatus];
-export type SessionStatus =
-  (typeof prismaRuntime.SessionStatus)[keyof typeof prismaRuntime.SessionStatus];
 export type UserStatus = (typeof prismaRuntime.UserStatus)[keyof typeof prismaRuntime.UserStatus];
 export type VerificationDecision =
   (typeof prismaRuntime.VerificationDecision)[keyof typeof prismaRuntime.VerificationDecision];

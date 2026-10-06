@@ -102,7 +102,13 @@ describe("AuthenticateWithPassword", () => {
         resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
         listActiveMethods: () => Promise.resolve([]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new NoopRateLimiter(),
+        DEFAULT_LOCKOUT_POLICY,
+        mfaChecker,
+      );
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
@@ -115,7 +121,13 @@ describe("AuthenticateWithPassword", () => {
         resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("optional"),
         listActiveMethods: () => Promise.resolve([{ id: "m1", type: "totp" }]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new NoopRateLimiter(),
+        DEFAULT_LOCKOUT_POLICY,
+        mfaChecker,
+      );
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
@@ -130,7 +142,13 @@ describe("AuthenticateWithPassword", () => {
         resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("required"),
         listActiveMethods: () => Promise.resolve([]),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), DEFAULT_LOCKOUT_POLICY, mfaChecker);
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new NoopRateLimiter(),
+        DEFAULT_LOCKOUT_POLICY,
+        mfaChecker,
+      );
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isOk(result)).toBe(true);
