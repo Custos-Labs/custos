@@ -6,5 +6,4 @@ pnpm-workspace.yaml
 planning
 # Quarantined -- see docs/QUARANTINE.md. Syntactically broken from repeated
 # bad merges, so prettier can't even parse these to check them.
-packages/sessions
 packages/verification

@@ -23,7 +23,6 @@ export default tseslint.config(
       // requests were merged without resolving conflicts, leaving multiple
       // implementations concatenated. Linting them reports hundreds of errors
       // that are all symptoms of that, which drowns out real findings.
-      "packages/sessions/**",
       "packages/verification/**",
       // Not built: written against a `webauthn_credentials` table that was
       // never migrated. See the header comment on

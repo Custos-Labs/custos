@@ -1,8 +1,8 @@
 # Quarantined packages
 
-`packages/sessions` and `packages/verification` do not build.
-Their `build`, `typecheck`, `test` and `lint` scripts are deliberately no-ops,
-and eslint skips them, so the rest of the repository — and the open pull
+`packages/verification` does not build.
+Its `build`, `typecheck`, `test` and `lint` scripts are deliberately no-ops,
+and eslint skips it, so the rest of the repository — and the open pull
 request queue — can be verified and merged.
 
 **No contributor's work has been deleted.** Every file is still in the
@@ -65,37 +65,6 @@ Several open pull requests rebuild parts of these packages properly. Merging
 those — with CI green — is likely to be a faster route than reconciling the
 current state by hand.
 
-## Lifted: `packages/mfa`
-
-`packages/mfa` was released from quarantine on 2026-10-04. Reconciling it was
-the work the section above describes: one `MfaMethod` was kept — the
-props-object aggregate, because it was the only one carrying the lockout and
-replay state the TOTP use cases call for — and the others were deleted, with
-the specs made to agree. What remained afterwards was ordinary cleanup:
-
-- `vitest.config.ts` declared `name` **twice**, as `@verixa/identity` and then
-  `@verixa/credentials`, so this package's 81 tests were reported under another
-  package's name. The duplicated key is the same "keep both sides" damage.
-- `as any` on both halves of the Prisma `upsert`. The mapper's row type already
-  matched the schema exactly, so the casts were suppressing nothing — except
-  any future drift between the two.
-- `JSON.parse` assigned straight to `string[]` when reading stored backup-code
-  hashes, so valid JSON of the wrong shape became a wrongly-typed array and
-  failed later, inside the verification loop, looking like a hashing fault.
-- Test doubles declared `async` with nothing to await, which is why the rule was
-  turned off wholesale rather than satisfied.
-
-One **security fix** came out of it. `infrastructure/crypto/encryption.ts` fell
-back to `Buffer.alloc(32, 1)` whenever `MFA_ENCRYPTION_KEY` was unset — and the
-variable was set nowhere in the repository: not in `.env.example`, not in the
-config package, not in CI. Every TOTP secret would have been encrypted at rest
-under a constant key visible in the source, with nothing logged or thrown to
-reveal it. `encrypt` now refuses to run without a key and validates its length,
-and `encryption.spec.ts` holds the regression test.
-
-The package now builds, typechecks, lints with zero errors, and passes 90 tests
-at 95% statement coverage.
-
 ## Lifted: `packages/mfa` (2026-10-04)
 
 Released from quarantine. Kept as the worked example for the other two, because
@@ -145,8 +114,56 @@ contain, which is how internals become someone else's dependency by accident.
 The package now builds, typechecks, lints with zero errors, and passes its
 suite at 93% statement coverage against a 90/90/85/85 gate.
 
+## Lifted: `packages/sessions` (2026-10-06)
+
+Two complete designs were concatenated across every layer — domain entities,
+every application port, every use case, and the infrastructure adapters.
+The tell was `Session`: one version held no token material at all (the
+bearer secret lives on a separate `RefreshToken`, rotated independently,
+with flat `ipAddress`/`userAgent` fields); the other was fully
+self-contained (`refreshTokenHash`, a `metadataHistory` array, and a
+`currentAccessToken` reference, all inline on the entity).
+
+**The real, working infrastructure settled which design was current.**
+`PrismaSessionRepository`'s row mapping, `JwtTokenSigner`'s HS256
+implementation, and `RedisRevocationList` all agreed on the first design —
+and only the first design has a migration backing it
+(`sessions`/`refresh_tokens` as two tables; no column anywhere stores a
+serialized metadata history or an inline access-token reference). The
+self-contained design was the earlier, abandoned branch. A third design for
+`TokenSigner` specifically (RS256 via `jose`, rich claims with `kid`) had no
+implementation at all and was pure dead weight.
+
+**Choosing the design didn't mean discarding the other branch's real
+feature.** Concurrent-session-limit eviction (Issue 094) and
+`SessionAuditLogger` — tied to the already-wired
+`SESSION_MAX_CONCURRENT_SESSIONS` config option — existed only in the
+self-contained branch's `IssueSession`, written against a
+`findActiveByUserId(userId, now)` signature the real repository never
+implemented. That logic was re-expressed against the kept design: eviction
+denylists the evicted session by its own `id` on `RevocationList` (keyed by
+session, not by a per-token id the entity no longer tracks), and
+`PrismaSessionRepository.findActiveByUserId` now orders by `lastSeenAt`
+ascending so eviction actually targets the oldest session, which neither
+concatenated version did correctly on its own.
+
+**A real bug surfaced once the suite could run against a live Postgres**:
+`prisma-session-repository.spec.ts`'s own `canConnect` helper called
+`net.createConnection()` and returned `true` immediately, without ever
+waiting for the socket's `connect` or `error` event — so the database-backed
+contract suite silently believed a database was reachable when none was.
+Replaced with the same wait-for-the-actual-event implementation already
+used in this package's own `redis-harness.ts` and in
+`tests/integration/helpers/tcp-connect.ts`.
+
+The package now builds, typechecks, lints with zero errors, and its full
+suite passes (database- and Redis-backed specs correctly skip without
+Docker, and CI's `REQUIRE_DATABASE_TESTS=1`/`REQUIRE_REDIS_TESTS=1` turn
+that skip into a failure if either is unexpectedly unreachable there).
+
 ## What is still verified
 
-Everything else: `shared-kernel`, `config`, `database`, `identity`,
-`credentials`, `audit`, `authorization`, `mfa`, `stellar-anchor`, `apps/api` and
-the integration suite all build, typecheck, lint and test.
+Everything except `packages/verification`: `shared-kernel`, `config`,
+`database`, `identity`, `credentials`, `audit`, `authorization`, `mfa`,
+`sessions`, `stellar-anchor`, `apps/api` and the integration suite all
+build, typecheck, lint and test.
