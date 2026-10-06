@@ -1,9 +1,14 @@
+import { createId } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
-import { createSessionId } from "../../domain/value-objects/session-id.js";
+import type { SessionId } from "../../domain/entities/session.js";
 
 import { revocationListContract } from "./contracts/revocation-list.contract.js";
 import { InMemoryRevocationList } from "./in-memory-revocation-list.js";
+
+function createSessionId(): SessionId {
+  return createId<"SessionId">();
+}
 
 describe("InMemoryRevocationList", () => {
   revocationListContract(() => new InMemoryRevocationList());
@@ -14,7 +19,7 @@ describe("InMemoryRevocationList", () => {
     const list = new InMemoryRevocationList(() => now);
     const sessionId = createSessionId();
 
-    await list.revoke(sessionId, 30);
+    await list.revoke(sessionId, new Date(now + 30_000));
     expect(await list.isRevoked(sessionId)).toBe(true);
 
     now += 29_000; // still inside the 30s window

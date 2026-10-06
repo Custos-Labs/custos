@@ -1,7 +1,7 @@
 import { describe } from "vitest";
 
-import { InMemorySessionRepository } from "./in-memory-session-repository.js";
 import { sessionRepositoryContract } from "./contracts/session-repository.contract.js";
+import { InMemorySessionRepository } from "./in-memory-session-repository.js";
 
 /**
  * Run the SessionRepository contract test suite against the in-memory fake.
