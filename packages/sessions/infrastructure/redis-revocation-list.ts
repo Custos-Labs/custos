@@ -3,40 +3,6 @@ import type { Redis } from "ioredis";
 import type { RevocationList } from "../application/ports/revocation-list.js";
 import type { SessionId } from "../domain/entities/session.js";
 
-const KEY_PREFIX = "sessions:revoked:";
-
-/**
- * Redis-backed `RevocationList`.
- *
- * Stored as a plain key per revoked session (`sessions:revoked:<id>`) with a
- * `PEXPIRE` matching how much longer the revocation needs to matter — once
- * the key expires, the access token it was blocking would have expired
- * naturally anyway, so there is nothing left to clean up. This is exactly
- * what makes Redis the right store for this port and not, say, an extra
- * Postgres table: the TTL *is* the cleanup job, rather than something a
- * background process has to remember to run. See `RevocationList` for the
- * fuller "why Redis" reasoning.
- *
- * `EX`/`PX` treats a duration in the past as "expire immediately" rather
- * than erroring, so a caller passing an `until` that's already elapsed still
- * gets a (harmlessly immediately-expired) key rather than a thrown Redis
- * error interrupting a security-critical revoke call.
- */
-export class RedisRevocationList implements RevocationList {
-  constructor(private readonly client: Redis) {}
-
-  async revoke(sessionId: SessionId, until: Date): Promise<void> {
-    const ttlMs = Math.max(1, until.getTime() - Date.now());
-    await this.client.set(KEY_PREFIX + sessionId, "1", "PX", ttlMs);
-  }
-
-  async isRevoked(sessionId: SessionId): Promise<boolean> {
-    const value = await this.client.get(KEY_PREFIX + sessionId);
-    return value !== null;
-  }
-}
-import type { SessionId } from "../domain/value-objects/session-id.js";
-
 export interface RedisRevocationListOptions {
   /**
    * Namespace prepended to every session id before it becomes a Redis key.
@@ -46,16 +12,23 @@ export interface RedisRevocationListOptions {
   readonly keyPrefix?: string;
 }
 
-const DEFAULT_KEY_PREFIX = "revoked:session:";
+const DEFAULT_KEY_PREFIX = "sessions:revoked:";
 
 /**
  * A Redis-backed {@link RevocationList}.
  *
- * Each revoked session is one key, set with a Redis `EX` expiry equal to the
- * remaining access-token lifetime the caller supplies. Redis evicts the key when
- * that expiry passes, so the deny-list garbage-collects itself and its size
- * tracks the access-token TTL rather than the all-time count of revocations —
- * the property that makes checking it on every request affordable.
+ * Stored as a plain key per revoked session, with a `PX` expiry matching how
+ * much longer the revocation needs to matter — once the key expires, the
+ * access token it was blocking would have expired naturally anyway, so there
+ * is nothing left to clean up. This is exactly what makes Redis the right
+ * store for this port and not, say, an extra Postgres table: the TTL *is*
+ * the cleanup job, rather than something a background process has to
+ * remember to run. See `RevocationList` for the fuller "why Redis" reasoning.
+ *
+ * `PX` treats a duration in the past as "expire immediately" rather than
+ * erroring, so a caller passing an `until` that's already elapsed still
+ * gets a (harmlessly immediately-expired) key rather than a thrown Redis
+ * error interrupting a security-critical revoke call.
  *
  * ## Fail-closed, and why
  *
@@ -69,54 +42,41 @@ const DEFAULT_KEY_PREFIX = "revoked:session:";
  * - **Fail closed** — "can't check, assume revoked" — refuses those tokens,
  *   at the cost of turning a Redis outage into an auth outage.
  *
- * This adapter **fails closed**. The deny-list exists specifically to shut down
- * sessions believed compromised; an implementation that quietly stops enforcing
- * it the moment its datastore hiccups defeats the reason it was built. An auth
- * outage is loud, bounded, and pages someone; a revocation-bypass window is
- * silent and is exactly the state an attacker with a revoked token is waiting
- * for. Availability is recoverable; a re-admitted stolen session may not be.
+ * This adapter **fails closed**. The deny-list exists specifically to shut
+ * down sessions believed compromised; an implementation that quietly stops
+ * enforcing it the moment its datastore hiccups defeats the reason it was
+ * built. An auth outage is loud, bounded, and pages someone; a
+ * revocation-bypass window is silent and is exactly the state an attacker
+ * with a revoked token is waiting for. Availability is recoverable; a
+ * re-admitted stolen session may not be. See `docs/security/token-design.md`.
  *
- * The tradeoff is real and is accepted deliberately — see
- * `docs/security/token-design.md`. It also raises the stakes on Redis
- * availability (replication, health checks), which is the correct place to
- * spend the effort. Callers that genuinely need fail-open for a specific,
- * lower-stakes path can wrap this and catch — but the safe default is not
- * theirs to forget.
- *
- * {@link revoke}, by contrast, lets errors propagate. A revocation that failed
- * to persist has not happened, and the caller (a logout, a reset) needs to know
- * that and retry or surface it — swallowing it would report success for a
- * session that is still live.
+ * {@link revoke}, by contrast, lets errors propagate. A revocation that
+ * failed to persist has not happened, and the caller (a logout, a reset)
+ * needs to know that and retry or surface it — swallowing it would report
+ * success for a session that is still live.
  */
 export class RedisRevocationList implements RevocationList {
   private readonly keyPrefix: string;
 
   constructor(
-    private readonly redis: Redis,
+    private readonly client: Redis,
     options: RedisRevocationListOptions = {},
   ) {
     this.keyPrefix = options.keyPrefix ?? DEFAULT_KEY_PREFIX;
   }
 
-  async revoke(sessionId: SessionId, ttlSeconds: number): Promise<void> {
-    // A non-positive TTL means no live token could still reference this session,
-    // so there is nothing to deny — writing a key that instantly expires (or,
-    // for a zero/negative EX, that Redis would reject) buys nothing.
-    if (ttlSeconds <= 0) {
-      return;
-    }
-    // Round up: a fractional second lost to flooring would let the deny-list
-    // entry expire a hair before the last token it needs to outlive.
-    await this.redis.set(this.keyFor(sessionId), "1", "EX", Math.ceil(ttlSeconds));
+  async revoke(sessionId: SessionId, until: Date): Promise<void> {
+    const ttlMs = Math.max(1, until.getTime() - Date.now());
+    await this.client.set(this.keyFor(sessionId), "1", "PX", ttlMs);
   }
 
   async isRevoked(sessionId: SessionId): Promise<boolean> {
     try {
-      const exists = await this.redis.exists(this.keyFor(sessionId));
-      return exists === 1;
+      const value = await this.client.get(this.keyFor(sessionId));
+      return value !== null;
     } catch {
-      // Fail closed. See the class comment: a session we cannot confirm is safe
-      // is treated as revoked, not waved through.
+      // Fail closed. See the class comment: a session we cannot confirm is
+      // safe is treated as revoked, not waved through.
       return true;
     }
   }

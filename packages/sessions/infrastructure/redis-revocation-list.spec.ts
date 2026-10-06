@@ -1,7 +1,8 @@
+import { createId } from "@verixa/shared-kernel";
 import { Redis } from "ioredis";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 
-import { createSessionId } from "../domain/value-objects/session-id.js";
+import type { SessionId } from "../domain/entities/session.js";
 
 import { RedisRevocationList } from "./redis-revocation-list.js";
 import { revocationListContract } from "./testing/contracts/revocation-list.contract.js";
@@ -15,6 +16,10 @@ import { startTestRedis, type TestRedis } from "./testing/redis-harness.js";
  * Skips when no Redis is reachable and Docker isn't available; see
  * `redis-harness.ts`. `REQUIRE_REDIS_TESTS=1` turns the skip into a failure.
  */
+
+function createSessionId(): SessionId {
+  return createId<"SessionId">();
+}
 
 const redis = await startTestRedis();
 
@@ -37,7 +42,7 @@ describe.skipIf(redis === undefined)("RedisRevocationList (real Redis)", () => {
     const list = new RedisRevocationList(test.client);
     const sessionId = createSessionId();
 
-    await list.revoke(sessionId, 1);
+    await list.revoke(sessionId, new Date(Date.now() + 1000));
     expect(await list.isRevoked(sessionId)).toBe(true);
 
     // Redis's minimum EX granularity is one second; wait comfortably past it.
@@ -50,7 +55,7 @@ describe.skipIf(redis === undefined)("RedisRevocationList (real Redis)", () => {
     const list = new RedisRevocationList(test.client, { keyPrefix: "denylist:" });
     const sessionId = createSessionId();
 
-    await list.revoke(sessionId, 60);
+    await list.revoke(sessionId, new Date(Date.now() + 60_000));
 
     await expect(test.client.exists(`denylist:${sessionId}`)).resolves.toBe(1);
   });
