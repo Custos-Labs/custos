@@ -21,6 +21,7 @@ operator deliberately added to an existing role.
 The viewer role is intentionally read-only. Keeping it explicit prevents a
 new write permission from accidentally becoming available to every user who
 was given the least-privilege role.
+
 # Role-Based Access Control (RBAC) Design
 
 This document details the security architecture and domain invariants governing Role-Based Access Control (RBAC) in Verixa (`packages/authorization`).

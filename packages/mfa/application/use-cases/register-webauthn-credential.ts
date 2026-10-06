@@ -4,7 +4,10 @@ import { ConflictError, Result, ValidationError, asId } from "@verixa/shared-ker
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import { WebAuthnChallenge } from "../../domain/entities/webauthn-challenge.js";
-import { WebAuthnCredential, type AuthenticatorTransport } from "../../domain/entities/webauthn-credential.js";
+import {
+  WebAuthnCredential,
+  type AuthenticatorTransport,
+} from "../../domain/entities/webauthn-credential.js";
 import type { AttestationVerifier } from "../ports/attestation-verifier.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
 import type { WebAuthnChallengeRepository } from "../ports/webauthn-challenge-repository.js";

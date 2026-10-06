@@ -24,7 +24,10 @@
 import type { PrismaClient } from "@prisma/client";
 import type { WebAuthnCredentialRepository } from "../../application/ports/webauthn-credential-repository.js";
 import type { UserId } from "../../domain/entities/mfa-method.js";
-import type { WebAuthnCredential, WebAuthnCredentialId } from "../../domain/entities/webauthn-credential.js";
+import type {
+  WebAuthnCredential,
+  WebAuthnCredentialId,
+} from "../../domain/entities/webauthn-credential.js";
 import { mapPrismaError } from "./error-mapper.js";
 import { WebAuthnCredentialMapper } from "./webauthn-credential-mapper.js";
 

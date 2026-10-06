@@ -205,6 +205,7 @@ acceptance criteria call for:
   `first-applicable` follows list order.
 - **permit + permit** — every algorithm permits.
 - **all not-applicable** — every algorithm returns `NOT_APPLICABLE`.
+
 # Policy DSL grammar
 
 This document defines the small expression language used to describe ABAC

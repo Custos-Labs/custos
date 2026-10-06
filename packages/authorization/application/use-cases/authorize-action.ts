@@ -120,9 +120,7 @@ export class AuthorizeAction {
    */
   private static describeReason(result: DomainAuthorizationDecision): string {
     const matched =
-      result.matchedPolicyIds.length > 0
-        ? ` (matched: ${result.matchedPolicyIds.join(", ")})`
-        : "";
+      result.matchedPolicyIds.length > 0 ? ` (matched: ${result.matchedPolicyIds.join(", ")})` : "";
     const granted = result.effect === "PERMIT";
 
     switch (result.source) {

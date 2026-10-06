@@ -63,3 +63,7 @@ overrides:
   # also covers. Constrained to the 6.x line, not a bare ">=": an unbounded
   # override resolved this to 8.x, same reasoning as nanoid above.
   vite: "^6.4.3"
+  # tinypool <2.1.2: prototype-pollution gadget in worker/run() options
+  # leading to RCE (two advisories, both closed at 2.1.2). Transitive via
+  # vitest's own worker-pool dependency.
+  tinypool: "^2.1.2"

@@ -167,6 +167,7 @@ catch.
   on top of.
 - `docs/guides/configuration.md` — how `packages/config` validates the
   environment variables read here.
+
 # Composition Root
 
 `apps/api/src/composition-root.ts` is the one file in the system allowed to
@@ -253,6 +254,7 @@ alone:
 Both assert the same thing at different depths: that the object graph
 resolves, and that resolving it produces something that actually behaves
 correctly, not merely something that compiles.
+
 # Composition Root & Dependency Inversion Guide
 
 This guide explains Verixa's composition root architecture, wiring conventions, package boundary enforcement, and coverage gating.

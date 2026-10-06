@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MfaChallenge, type MfaChallengeUserId } from "../../domain/entities/mfa-challenge.js";
 
-import { ConsumeMfaChallenge, type MfaChallengeRepository, type SessionIssuer } from "./consume-mfa-challenge.js";
+import {
+  ConsumeMfaChallenge,
+  type MfaChallengeRepository,
+  type SessionIssuer,
+} from "./consume-mfa-challenge.js";
 
 const userId: MfaChallengeUserId = asId("11111111-1111-1111-1111-111111111111");
 
@@ -24,7 +28,9 @@ describe("ConsumeMfaChallenge", () => {
     // flags, since a method read off its object is detached from `this`.
     const execute = vi
       .fn()
-      .mockResolvedValue(Result.ok({ session: {}, accessToken: "token", rawRefreshToken: "refresh" }));
+      .mockResolvedValue(
+        Result.ok({ session: {}, accessToken: "token", rawRefreshToken: "refresh" }),
+      );
     const sessionIssuer: SessionIssuer = { execute };
 
     const useCase = new ConsumeMfaChallenge(fakeChallengeRepository(challenge), sessionIssuer);

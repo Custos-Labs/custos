@@ -228,8 +228,8 @@ round trips, which is the thing that actually costs.
 - [`docs/performance/audit-write-throughput.md`](../performance/audit-write-throughput.md)
 - [`docs/guides/domain-modeling.md`](../guides/domain-modeling.md)
 - [`docs/guides/testing.md`](../guides/testing.md)
-How Verixa keeps the audit log trustworthy — and, in this revision, how it
-stops the audit log from becoming the easiest way to leak what it records.
+  How Verixa keeps the audit log trustworthy — and, in this revision, how it
+  stops the audit log from becoming the easiest way to leak what it records.
 
 This document is shared by several Phase 10 issues. The hash-chain,
 verification and retention sections belong to Issues 183, 190, 191 and 192 and
@@ -359,11 +359,11 @@ would hand them a method that ignores tenancy.
   touching storage, the self-record written with actor, organization and
   filters, the export recorded before its stream is consumed, fail-closed
   behaviour when the record cannot be written, and the page-size cap.
-Verixa's audit log is **append-only and hash-chained**, and it is anchored
-periodically to a public ledger. Those are two different guarantees, obtained
-by two different mechanisms, and neither one is sufficient on its own. This
-document says what each of them buys, what it does not, and how to actually
-run the check.
+  Verixa's audit log is **append-only and hash-chained**, and it is anchored
+  periodically to a public ledger. Those are two different guarantees, obtained
+  by two different mechanisms, and neither one is sufficient on its own. This
+  document says what each of them buys, what it does not, and how to actually
+  run the check.
 
 ## The threat this is written against
 

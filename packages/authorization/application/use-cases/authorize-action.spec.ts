@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  PolicyDecisionPoint,
-  PolicyEvaluation,
-} from "../ports/policy-decision-point.js";
+import type { PolicyDecisionPoint, PolicyEvaluation } from "../ports/policy-decision-point.js";
 import type { RoleDecision, RolePermissionGate } from "../ports/role-permission-gate.js";
 import { AuthorizationService } from "../services/authorization-service.js";
 import { ResourceAttributeResolverRegistry } from "../services/resource-attribute-resolver-registry.js";
@@ -39,8 +36,7 @@ function stubPdp(
   matchedPolicyIds: readonly string[] = [],
 ): PolicyDecisionPoint {
   return {
-    evaluate: () =>
-      Promise.resolve({ effect, reason: `stubbed ${effect}`, matchedPolicyIds }),
+    evaluate: () => Promise.resolve({ effect, reason: `stubbed ${effect}`, matchedPolicyIds }),
   };
 }
 
@@ -71,7 +67,9 @@ describe("AuthorizeAction", () => {
     });
 
     it("grants via RBAC and says so in the reason, with no matched policies", async () => {
-      const useCase = new AuthorizeAction(new AuthorizationService(stubGate("grant"), noPolicies()));
+      const useCase = new AuthorizeAction(
+        new AuthorizationService(stubGate("grant"), noPolicies()),
+      );
 
       const decision = await useCase.execute({
         subjectId: "user-1",
@@ -125,9 +123,7 @@ describe("AuthorizeAction", () => {
     });
 
     it("denies with the fail-closed default reason when neither RBAC nor ABAC has an opinion", async () => {
-      const useCase = new AuthorizeAction(
-        new AuthorizationService(noGrants(), noPolicies()),
-      );
+      const useCase = new AuthorizeAction(new AuthorizationService(noGrants(), noPolicies()));
 
       const decision = await useCase.execute({
         subjectId: "user-1",

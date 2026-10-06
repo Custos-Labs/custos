@@ -267,6 +267,7 @@ no separate "is this worth showing the user" rule duplicated at the use-case
 layer: a session the domain considers inactive is not a device the user can
 still do anything with, and showing it as though it were logged in would be
 misleading rather than merely stale.
+
 ## Streaming a large result: `ExportAuditEvents`
 
 `ExportAuditEvents` (`packages/audit/application/use-cases/export-audit-events.ts`,
@@ -312,6 +313,7 @@ its quotes doubled per RFC 4180. "Just join the fields with commas" is exactly
 the injection the audit-metadata issue calls out, and the round-trip test in
 `export-audit-events.spec.ts` pins the escaping against metadata laden with
 delimiters, quotes and line breaks.
+
 ## Scoped uniqueness: `CreateRole`
 
 `CreateRole` (`packages/authorization/application/use-cases/create-role.ts`,
@@ -339,6 +341,7 @@ Issue 132) demonstrate the classic DDD principle that cross-aggregate invariants
 - `RevokePermissionFromRole` invokes `Role.revoke(permission)`, which protects system roles (`super-admin`)
   from having critical permissions stripped away, translating domain-level `SystemRoleImmutableError` into
   structured results.
+
 ## Use cases that delegate their rules: the review flow
 
 `ClaimNextReviewCase`, `ApproveVerification`, `RejectVerification` and

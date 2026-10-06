@@ -2,10 +2,7 @@ import { asId } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Permission } from "../../domain/value-objects/permission.js";
-import type {
-  AuthenticatedPrincipal,
-  RequestWithPrincipal,
-} from "../guards/require-permission.js";
+import type { AuthenticatedPrincipal, RequestWithPrincipal } from "../guards/require-permission.js";
 import {
   requireAllPermissions,
   requireAnyPermission,
