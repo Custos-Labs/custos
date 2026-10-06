@@ -119,12 +119,31 @@ describe.skipIf(!available)("PrismaSessionRepository (Issue 083)", () => {
 
   describe("index verification", () => {
     it("sessions_user_id_idx is used for findActiveByUserId queries", async () => {
+      // Same reasoning as the expiry-sweep test below: on a tiny table
+      // Postgres correctly prefers a sequential scan, so this needs enough
+      // bystander rows -- owned by other users -- for the target user's
+      // single session to be a genuinely selective match.
       const repository = new PrismaSessionRepository(prisma);
       const userId = await setupUser();
       const session = Session.open({ userId, policy: SessionExpiryPolicy.default() });
-
       createdSessionIds.push(session.id);
       await repository.save(session);
+
+      const bystanderUserId = await setupUser();
+      const now = new Date();
+      const bystanderRows = Array.from({ length: 2000 }, (_unused, offset) => ({
+        id: createId<"SessionId">(),
+        userId: bystanderUserId,
+        createdAt: now,
+        lastSeenAt: now,
+        expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000 + offset * 1000),
+        ipAddress: null,
+        userAgent: null,
+        revokedAt: null,
+      }));
+      createdSessionIds.push(...bystanderRows.map((row) => row.id));
+      await prisma.session.createMany({ data: bystanderRows });
+      await prisma.$executeRawUnsafe("ANALYZE sessions;");
 
       const explainResult = await prisma.$queryRawUnsafe<{ "QUERY PLAN": string }[]>(
         `EXPLAIN (FORMAT JSON, ANALYZE)

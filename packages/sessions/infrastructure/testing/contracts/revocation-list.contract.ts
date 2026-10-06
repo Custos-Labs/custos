@@ -58,24 +58,10 @@ export function revocationListContract(
       const list = await createList();
       const sessionId = createSessionId();
 
-      const firstUntil = new Date(Date.now() + ONE_MINUTE_MS);
-      await list.revoke(sessionId, firstUntil);
-      const afterFirst = await list.isRevoked(sessionId);
-      const secondUntil = new Date(Date.now() + ONE_MINUTE_MS);
-      await list.revoke(sessionId, secondUntil);
-      const afterSecond = await list.isRevoked(sessionId);
+      await list.revoke(sessionId, new Date(Date.now() + ONE_MINUTE_MS));
+      await list.revoke(sessionId, new Date(Date.now() + ONE_MINUTE_MS));
 
-      if (!afterSecond) {
-        console.error("DIAGNOSTIC idempotency failure:", {
-          sessionId,
-          firstUntil,
-          secondUntil,
-          afterFirst,
-          afterSecond,
-        });
-      }
-
-      expect(afterSecond).toBe(true);
+      await expect(list.isRevoked(sessionId)).resolves.toBe(true);
     });
   });
 }
