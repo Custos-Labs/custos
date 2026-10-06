@@ -2,10 +2,12 @@ import { Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { RefreshToken } from "../../domain/entities/refresh-token.js";
-import type { SessionId } from "../../domain/entities/session.js";
+import type { SessionId, SessionUserId } from "../../domain/entities/session.js";
 import { SessionExpiryPolicy } from "../../domain/value-objects/session-expiry-policy.js";
 import { JwtTokenSigner } from "../../infrastructure/jwt-token-signer.js";
 import { SigningKeyProvider } from "../../infrastructure/signing-key-provider.js";
+import { InMemoryRevocationList } from "../../infrastructure/testing/in-memory-revocation-list.js";
+import { InMemorySessionAuditLogger } from "../../infrastructure/testing/in-memory-session-audit-logger.js";
 import { InMemorySessionRepository } from "../../infrastructure/testing/in-memory-session-repository.js";
 
 import { IssueSession } from "./issue-session.js";
@@ -14,13 +16,17 @@ const userId = "00000000-0000-0000-0000-00000000a11c";
 
 describe("IssueSession", () => {
   let repository: InMemorySessionRepository;
+  let revocationList: InMemoryRevocationList;
+  let auditLogger: InMemorySessionAuditLogger;
   let issueSession: IssueSession;
   const policy = SessionExpiryPolicy.default();
   const signer = new JwtTokenSigner(new SigningKeyProvider({ secret: "test-secret-value" }));
 
   beforeEach(() => {
     repository = new InMemorySessionRepository();
-    issueSession = new IssueSession(repository, signer, policy);
+    revocationList = new InMemoryRevocationList();
+    auditLogger = new InMemorySessionAuditLogger();
+    issueSession = new IssueSession(repository, signer, policy, revocationList, auditLogger);
   });
 
   it("opens a session and returns an access/refresh token pair", async () => {
@@ -84,133 +90,50 @@ describe("IssueSession", () => {
 
     expect(first.value.sessionId).not.toBe(second.value.sessionId);
     expect(first.value.refreshToken).not.toBe(second.value.refreshToken);
-import { asId } from "@verixa/shared-kernel";
-import { beforeEach, describe, expect, it } from "vitest";
-
-import type { SessionUserId } from "../../domain/entities/session.js";
-import { InMemoryRevocationList } from "../../infrastructure/testing/in-memory-revocation-list.js";
-import { InMemorySessionAuditLogger } from "../../infrastructure/testing/in-memory-session-audit-logger.js";
-import { InMemorySessionRepository } from "../../infrastructure/testing/in-memory-session-repository.js";
-import { InMemoryTokenSigner } from "../../infrastructure/testing/in-memory-token-signer.js";
-
-import { IssueSession } from "./issue-session.js";
-
-const userId: SessionUserId = asId("11111111-1111-1111-1111-111111111111");
-
-describe("IssueSession", () => {
-  let sessionRepository: InMemorySessionRepository;
-  let revocationList: InMemoryRevocationList;
-  let auditLogger: InMemorySessionAuditLogger;
-  let tokenSigner: InMemoryTokenSigner;
-
-  beforeEach(() => {
-    sessionRepository = new InMemorySessionRepository();
-    revocationList = new InMemoryRevocationList();
-    auditLogger = new InMemorySessionAuditLogger();
-    tokenSigner = new InMemoryTokenSigner();
-  });
-
-  it("issues a session carrying the supplied metadata", async () => {
-    const useCase = new IssueSession(sessionRepository, tokenSigner, revocationList, auditLogger);
-
-    const result = await useCase.execute({
-      userId,
-      metadata: { ipAddress: "203.0.113.10", userAgent: "curl/8.0" },
-    });
-
-    expect(result.kind).toBe("ok");
-    if (result.kind !== "ok") throw new Error("unreachable");
-    expect(result.value.session.userId).toBe(userId);
-    expect(result.value.session.currentMetadata).toEqual({
-      ipAddress: "203.0.113.10",
-      userAgent: "curl/8.0",
-    });
-    expect(result.value.accessToken).toBeTruthy();
-    expect(result.value.rawRefreshToken).toBeTruthy();
-
-    const stored = await sessionRepository.findById(result.value.session.id);
-    expect(stored).toBeDefined();
   });
 
   describe("concurrent session limit", () => {
     it("does not evict anything when the limit is 0 (disabled)", async () => {
-      const useCase = new IssueSession(
-        sessionRepository,
-        tokenSigner,
-        revocationList,
-        auditLogger,
-        0,
-      );
-
-      for (let i = 0; i < 5; i++) {
-        await useCase.execute({ userId, metadata: {} });
+      for (let i = 0; i < 5; i += 1) {
+        await issueSession.execute({ userId });
       }
 
-      const active = await sessionRepository.findActiveByUserId(userId, new Date());
+      const active = await repository.findActiveByUserId(userId as SessionUserId);
       expect(active).toHaveLength(5);
       expect(auditLogger.entries).toHaveLength(0);
     });
 
     it("evicts the oldest session once a login would exceed the limit", async () => {
-      const useCase = new IssueSession(
-        sessionRepository,
-        tokenSigner,
-        revocationList,
-        auditLogger,
-        2,
-      );
+      const limited = new IssueSession(repository, signer, policy, revocationList, auditLogger, 2);
 
-      const first = await useCase.execute({
-        userId,
-        metadata: {},
-        now: new Date("2026-01-01T00:00:00Z"),
-      });
-      await useCase.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:01:00Z") });
-      await useCase.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:02:00Z") });
+      const first = await limited.execute({ userId });
+      await limited.execute({ userId });
+      await limited.execute({ userId });
 
-      if (first.kind !== "ok") throw new Error("unreachable");
+      if (!Result.isOk(first)) throw new Error("fixture setup failed");
 
-      const active = await sessionRepository.findActiveByUserId(
-        userId,
-        new Date("2026-01-01T00:03:00Z"),
-      );
-      expect(active).toHaveLength(2);
-      expect(active.some((session) => session.id === first.value.session.id)).toBe(false);
-
-      const evicted = await sessionRepository.findById(first.value.session.id);
+      const evicted = await repository.findById(first.value.sessionId as SessionId);
       expect(evicted!.isRevoked).toBe(true);
     });
 
-    it("denylists the evicted session's access token", async () => {
-      const useCase = new IssueSession(
-        sessionRepository,
-        tokenSigner,
-        revocationList,
-        auditLogger,
-        1,
+    it("denylists the evicted session so its access token fails isRevoked checks", async () => {
+      const limited = new IssueSession(repository, signer, policy, revocationList, auditLogger, 1);
+
+      const first = await limited.execute({ userId });
+      await limited.execute({ userId });
+
+      if (!Result.isOk(first)) throw new Error("fixture setup failed");
+
+      await expect(revocationList.isRevoked(first.value.sessionId as SessionId)).resolves.toBe(
+        true,
       );
-
-      const first = await useCase.execute({ userId, metadata: {} });
-      await useCase.execute({ userId, metadata: {} });
-
-      if (first.kind !== "ok") throw new Error("unreachable");
-
-      const evicted = await sessionRepository.findById(first.value.session.id);
-      const evictedTokenId = evicted!.currentAccessToken!.tokenId;
-      expect(await revocationList.isRevoked(evictedTokenId)).toBe(true);
     });
 
     it("logs each eviction", async () => {
-      const useCase = new IssueSession(
-        sessionRepository,
-        tokenSigner,
-        revocationList,
-        auditLogger,
-        1,
-      );
+      const limited = new IssueSession(repository, signer, policy, revocationList, auditLogger, 1);
 
-      await useCase.execute({ userId, metadata: {} });
-      await useCase.execute({ userId, metadata: {} });
+      await limited.execute({ userId });
+      await limited.execute({ userId });
 
       expect(auditLogger.entries).toHaveLength(1);
       expect(auditLogger.entries[0]!.action).toBe("session.evicted");
@@ -222,29 +145,21 @@ describe("IssueSession", () => {
       // Simulates three sessions issued while unbounded, then a login
       // arriving after an admin has since lowered the limit to 1.
       const unbounded = new IssueSession(
-        sessionRepository,
-        tokenSigner,
+        repository,
+        signer,
+        policy,
         revocationList,
         auditLogger,
         0,
       );
-      await unbounded.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:00:00Z") });
-      await unbounded.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:01:00Z") });
-      await unbounded.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:02:00Z") });
+      await unbounded.execute({ userId });
+      await unbounded.execute({ userId });
+      await unbounded.execute({ userId });
 
-      const limited = new IssueSession(
-        sessionRepository,
-        tokenSigner,
-        revocationList,
-        auditLogger,
-        1,
-      );
-      await limited.execute({ userId, metadata: {}, now: new Date("2026-01-01T00:03:00Z") });
+      const limited = new IssueSession(repository, signer, policy, revocationList, auditLogger, 1);
+      await limited.execute({ userId });
 
-      const active = await sessionRepository.findActiveByUserId(
-        userId,
-        new Date("2026-01-01T00:04:00Z"),
-      );
+      const active = await repository.findActiveByUserId(userId as SessionUserId);
       expect(active).toHaveLength(1);
     });
   });

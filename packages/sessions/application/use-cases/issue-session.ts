@@ -1,15 +1,12 @@
 import { asId, Result, ValidationError } from "@verixa/shared-kernel";
 
 import { RefreshToken } from "../../domain/entities/refresh-token.js";
-import { Session, type SessionMetadata, type SessionUserId } from "../../domain/entities/session.js";
-import type { SessionExpiryPolicy } from "../../domain/value-objects/session-expiry-policy.js";
-import { asId, Result } from "@verixa/shared-kernel";
-
 import {
   Session,
   type SessionMetadata,
   type SessionUserId,
 } from "../../domain/entities/session.js";
+import type { SessionExpiryPolicy } from "../../domain/value-objects/session-expiry-policy.js";
 import type { RevocationList } from "../ports/revocation-list.js";
 import type { SessionAuditLogger } from "../ports/session-audit-logger.js";
 import type { SessionRepository } from "../ports/session-repository.js";
@@ -30,6 +27,17 @@ export interface IssuedSession {
 export type IssueSessionError = ValidationError;
 
 /**
+ * Zero (the default) disables enforcement — see Issue 094's acceptance
+ * criterion "limit of 0/unset disables enforcement." Sizing this above zero
+ * is a per-deployment product decision (banking apps tend to pick 1–3,
+ * consumer SaaS often skips it entirely), which is why it is a constructor
+ * parameter here rather than a constant: the composition root reads it from
+ * `@verixa/config` and this use case stays ignorant of environment
+ * variables entirely.
+ */
+const DEFAULT_MAX_CONCURRENT_SESSIONS = 0;
+
+/**
  * Opens a new `Session` for a user who just authenticated (e.g. via
  * `AuthenticateWithPassword` in `packages/credentials`), and issues the
  * first access/refresh token pair for it.
@@ -39,66 +47,30 @@ export type IssueSessionError = ValidationError;
  * context's job (Phase 04); this use case only ever runs after that has
  * already succeeded, the same separation `Credential` vs. `User` draws in
  * `packages/identity`/`packages/credentials`.
-  readonly metadata: SessionMetadata;
-  readonly now?: Date;
-}
-
-export interface IssueSessionResult {
-  readonly session: Session;
-  readonly accessToken: string;
-  readonly rawRefreshToken: string;
-}
-
-/**
- * Zero (the default) disables enforcement — see Issue 094's acceptance
- * criterion "limit of 0/unset disables enforcement." Sizing this above zero
- * is a per-deployment product decision (banking apps tend to pick 1–3;
- * consumer SaaS often skips it entirely), which is why it is a constructor
- * parameter here rather than a constant: the composition root reads it from
- * `@verixa/config` and this use case stays ignorant of environment
- * variables entirely.
- */
-const DEFAULT_MAX_CONCURRENT_SESSIONS = 0;
-
-/**
- * Issues a new session for a user who just authenticated: signs an access
- * token, mints a session (capturing the login's device/IP/user-agent per
- * Issue 093), and — this is Issue 094 — evicts the least-recently-active
- * existing session first if the login would otherwise exceed the
- * configured concurrent-session limit.
  *
- * ## Why eviction happens before the new session is created, not after
+ * ## Concurrent-session eviction (Issue 094)
  *
- * If the new session were saved first, a limit of `N` would briefly allow
- * `N + 1` live sessions to exist, and a crash between the save and the
- * eviction would leave that extra session behind permanently — the bound
- * this use case exists to enforce would be violated by the very code
- * enforcing it. Evicting first means the invariant ("at most N active
- * sessions") holds after every step, not just at the end of a successful
- * run.
+ * When `maxConcurrentSessions` is positive and the user is already at the
+ * limit, the least-recently-active existing session is evicted *before* the
+ * new one is created — not after. If the new session were saved first, a
+ * limit of `N` would briefly allow `N + 1` live sessions to exist, and a
+ * crash between the save and the eviction would leave that extra session
+ * behind permanently. Evicting first means the invariant ("at most `N`
+ * active sessions") holds after every step, not just at the end of a
+ * successful run.
  *
- * ## Why only one eviction happens per call, in a loop
- *
- * A single login should only ever be pushing the count over the limit by
- * one. Looping rather than special-casing "evict exactly one" is what keeps
- * this correct even if the limit was lowered by an admin since the last
- * login and several existing sessions now exceed it — this call brings the
- * account back under the limit rather than merely not making it worse.
- *
- * ## Why an evicted session's access token is denylisted too
- *
- * `Session.revoke` only stops the *refresh* token from working. Its access
- * token is a self-contained JWT that would otherwise keep authenticating
- * requests until its own `exp` — an evicted session that is still, in
- * effect, logged in for a few more minutes. Denylisting
- * `currentAccessToken` through the `RevocationList` closes that gap, the
- * same way `Logout` does for a user-initiated sign-out.
+ * An evicted session's access token is denylisted on `RevocationList`,
+ * keyed by the session's own id — see `RevocationList` for why that's
+ * enough without `Session` tracking which token is current.
  */
 export class IssueSession {
   constructor(
     private readonly sessionRepository: SessionRepository,
     private readonly tokenSigner: TokenSigner,
     private readonly expiryPolicy: SessionExpiryPolicy,
+    private readonly revocationList: RevocationList,
+    private readonly sessionAuditLogger: SessionAuditLogger,
+    private readonly maxConcurrentSessions: number = DEFAULT_MAX_CONCURRENT_SESSIONS,
   ) {}
 
   async execute(command: IssueSessionCommand): Promise<Result<IssuedSession, IssueSessionError>> {
@@ -107,12 +79,17 @@ export class IssueSession {
     }
 
     const userId = asId<"UserId">(command.userId) as SessionUserId;
+    const now = new Date();
+
+    if (this.maxConcurrentSessions > 0) {
+      await this.evictOldestUntilUnderLimit(userId, now);
+    }
+
     const metadata: SessionMetadata = {
       ipAddress: command.ipAddress,
       userAgent: command.userAgent,
     };
 
-    const now = new Date();
     const session = Session.open({ userId, policy: this.expiryPolicy, metadata, now });
     const { refreshToken, token: rawRefreshToken } = RefreshToken.issue({
       sessionId: session.id,
@@ -134,61 +111,29 @@ export class IssueSession {
       refreshToken: rawRefreshToken,
     });
   }
-    private readonly revocationList: RevocationList,
-    private readonly sessionAuditLogger: SessionAuditLogger,
-    private readonly maxConcurrentSessions: number = DEFAULT_MAX_CONCURRENT_SESSIONS,
-  ) {}
-
-  async execute(command: IssueSessionCommand): Promise<Result<IssueSessionResult, never>> {
-    const now = command.now ?? new Date();
-    const userId = asId<"UserId">(command.userId);
-
-    if (this.maxConcurrentSessions > 0) {
-      await this.evictOldestUntilUnderLimit(userId, now);
-    }
-
-    // Signed before the session exists so the session can be constructed in
-    // one step with a fully-formed `currentAccessToken`, rather than issued
-    // and then immediately patched. See `TokenSigner` for why this needs no
-    // session id.
-    const accessToken = await this.tokenSigner.issueAccessToken({ userId, now });
-
-    const issued = Session.issue({
-      userId,
-      metadata: command.metadata,
-      accessToken: { tokenId: accessToken.tokenId, expiresAt: accessToken.expiresAt },
-      now,
-    });
-
-    await this.sessionRepository.save(issued.session);
-
-    return Result.ok({
-      session: issued.session,
-      accessToken: accessToken.token,
-      rawRefreshToken: issued.rawRefreshToken,
-    });
-  }
 
   private async evictOldestUntilUnderLimit(userId: SessionUserId, now: Date): Promise<void> {
     // The new session is not saved yet, so "at the limit" (not "over it") is
     // the trigger: adding one more would make `active.length + 1` exceed
     // `maxConcurrentSessions` unless one is evicted first.
     for (;;) {
-      const active = await this.sessionRepository.findActiveByUserId(userId, now);
+      const active = await this.sessionRepository.findActiveByUserId(userId);
       if (active.length < this.maxConcurrentSessions) {
         return;
       }
 
-      // `findActiveByUserId` is documented to return oldest-`lastActiveAt`
+      // `findActiveByUserId` is documented to return oldest-`lastSeenAt`
       // first; the eviction target is therefore always `active[0]`.
       const oldest = active[0]!;
       await this.sessionRepository.save(oldest.revoke(now));
-      if (oldest.currentAccessToken !== undefined) {
-        await this.revocationList.revoke(
-          oldest.currentAccessToken.tokenId,
-          oldest.currentAccessToken.expiresAt,
-        );
-      }
+      // The evicted session's access token has no tracked expiry on the
+      // entity (see `Session`'s doc comment); revoking through at least
+      // `now + accessTokenTtlMs` covers any token issued under it, however
+      // recently.
+      await this.revocationList.revoke(
+        oldest.id,
+        new Date(now.getTime() + this.expiryPolicy.accessTokenTtlMs),
+      );
       await this.sessionAuditLogger.record("session.evicted", userId, {
         evictedSessionId: oldest.id,
         reason: "concurrent_session_limit",
