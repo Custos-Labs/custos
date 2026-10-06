@@ -6,10 +6,6 @@ import { RefreshToken } from "../../../domain/entities/refresh-token.js";
 import { Session, type SessionUserId } from "../../../domain/entities/session.js";
 import { SessionExpiryPolicy } from "../../../domain/value-objects/session-expiry-policy.js";
 
-function makeUserId(): SessionUserId {
-  return createId<"UserId">();
-}
-
 function makeSession(userId: SessionUserId, now = new Date()): Session {
   return Session.open({ userId, policy: SessionExpiryPolicy.default(), now });
 }
@@ -21,12 +17,21 @@ function makeSession(userId: SessionUserId, now = new Date()): Session {
  * testing**: one shared suite, multiple implementations, each proven to
  * behave identically rather than merely "compile against the same
  * interface." See `docs/guides/testing.md`.
+ *
+ * `setupUser` supplies the `userId` each test builds a session against.
+ * The in-memory fake doesn't care whether a user actually exists, so the
+ * default just mints an id; `PrismaSessionRepository`'s own spec overrides
+ * this to insert a real `User` row first — `sessions.user_id` carries a
+ * foreign key, and a real Postgres enforces it even though the fake can't.
  */
-export function sessionRepositoryContract(createRepository: () => SessionRepository): void {
+export function sessionRepositoryContract(
+  createRepository: () => SessionRepository,
+  setupUser: () => Promise<SessionUserId> | SessionUserId = () => createId<"UserId">(),
+): void {
   describe("SessionRepository contract", () => {
     it("returns undefined for a session that was never saved", async () => {
       const repository = createRepository();
-      const session = makeSession(makeUserId());
+      const session = makeSession(await setupUser());
 
       const found = await repository.findById(session.id);
 
@@ -35,7 +40,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("finds a saved session by id", async () => {
       const repository = createRepository();
-      const session = makeSession(makeUserId());
+      const session = makeSession(await setupUser());
 
       await repository.save(session);
 
@@ -57,7 +62,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("save is an idempotent upsert", async () => {
       const repository = createRepository();
-      const session = makeSession(makeUserId());
+      const session = makeSession(await setupUser());
 
       await repository.save(session);
 
@@ -72,14 +77,14 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
     it("returns empty array when a user has no active sessions", async () => {
       const repository = createRepository();
 
-      const active = await repository.findActiveByUserId(makeUserId());
+      const active = await repository.findActiveByUserId(await setupUser());
 
       expect(active).toEqual([]);
     });
 
     it("finds active sessions for a user", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
+      const userId = await setupUser();
       const session1 = makeSession(userId);
       const session2 = makeSession(userId);
 
@@ -95,7 +100,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("excludes revoked sessions from findActiveByUserId", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
+      const userId = await setupUser();
       const session1 = makeSession(userId);
       const session2 = makeSession(userId);
 
@@ -110,7 +115,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("orders findActiveByUserId results by lastSeenAt ascending (oldest first)", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
+      const userId = await setupUser();
       const now = new Date();
 
       const session1 = makeSession(userId, new Date(now.getTime() - 3000));
@@ -130,7 +135,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("revokeAllForUser marks all sessions for that user as revoked", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
+      const userId = await setupUser();
       const session1 = makeSession(userId);
       const session2 = makeSession(userId);
 
@@ -148,8 +153,8 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("revokeAllForUser does not affect other users' sessions", async () => {
       const repository = createRepository();
-      const user1Id = makeUserId();
-      const user2Id = makeUserId();
+      const user1Id = await setupUser();
+      const user2Id = await setupUser();
       const user1Session = makeSession(user1Id);
       const user2Session = makeSession(user2Id);
 
@@ -168,12 +173,12 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
     it("revokeAllForUser for a user with no sessions is a silent no-op", async () => {
       const repository = createRepository();
 
-      await expect(repository.revokeAllForUser(makeUserId())).resolves.toBeUndefined();
+      await expect(repository.revokeAllForUser(await setupUser())).resolves.toBeUndefined();
     });
 
     it("after revokeAllForUser, findActiveByUserId returns an empty array", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
+      const userId = await setupUser();
       const session1 = makeSession(userId);
       const session2 = makeSession(userId);
 
@@ -189,7 +194,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("finds a saved refresh token by its hash", async () => {
       const repository = createRepository();
-      const session = makeSession(makeUserId());
+      const session = makeSession(await setupUser());
       await repository.save(session);
 
       const { refreshToken, token } = RefreshToken.issue({
@@ -215,7 +220,7 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("saveRefreshToken is an idempotent upsert", async () => {
       const repository = createRepository();
-      const session = makeSession(makeUserId());
+      const session = makeSession(await setupUser());
       await repository.save(session);
 
       const { refreshToken, token } = RefreshToken.issue({

@@ -74,6 +74,7 @@ const available = await databaseAvailability();
 describe.skipIf(!available)("PrismaSessionRepository (Issue 083)", () => {
   let prisma: PrismaClient;
   const createdSessionIds: string[] = [];
+  const createdUserIds: string[] = [];
 
   beforeAll(() => {
     prisma = createTestPrismaClient();
@@ -84,20 +85,42 @@ describe.skipIf(!available)("PrismaSessionRepository (Issue 083)", () => {
       await prisma.session.deleteMany({ where: { id: { in: createdSessionIds } } });
       createdSessionIds.length = 0;
     }
+    if (createdUserIds.length > 0) {
+      await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+      createdUserIds.length = 0;
+    }
   });
 
   afterAll(async () => {
     await prisma.$disconnect();
   });
 
+  /** `sessions.user_id` carries a foreign key; a real Postgres enforces it even though the in-memory fake can't. */
+  async function setupUser(): Promise<SessionUserId> {
+    const id = createId<"UserId">();
+    const now = new Date();
+    await prisma.user.create({
+      data: {
+        id,
+        email: `sessions-${id}@example.com`,
+        displayName: "Sessions Test User",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    createdUserIds.push(id);
+    return id;
+  }
+
   describe("contract tests", () => {
-    sessionRepositoryContract(() => new PrismaSessionRepository(prisma));
+    sessionRepositoryContract(() => new PrismaSessionRepository(prisma), setupUser);
   });
 
   describe("index verification", () => {
     it("sessions_user_id_idx is used for findActiveByUserId queries", async () => {
       const repository = new PrismaSessionRepository(prisma);
-      const userId = createId<"UserId">() as SessionUserId;
+      const userId = await setupUser();
       const session = Session.open({ userId, policy: SessionExpiryPolicy.default() });
 
       createdSessionIds.push(session.id);
@@ -121,7 +144,7 @@ describe.skipIf(!available)("PrismaSessionRepository (Issue 083)", () => {
     });
 
     it("sessions_expires_at_idx is used for expiry sweep queries", async () => {
-      const userId = createId<"UserId">() as SessionUserId;
+      const userId = await setupUser();
       const now = new Date();
       const expiredSession = Session.reconstitute({
         id: createId<"SessionId">(),
