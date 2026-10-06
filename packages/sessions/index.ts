@@ -6,25 +6,12 @@
 
 // Domain: entities
 export type { SessionId, SessionMetadata, SessionUserId } from "./domain/entities/session.js";
-export type {
-  AccessTokenReference,
-  IssuedSession,
-  SessionId,
-  SessionMetadata,
-  SessionMetadataObservation,
-  SessionUserId,
-} from "./domain/entities/session.js";
 export { Session } from "./domain/entities/session.js";
 export type { IssuedRefreshToken, RefreshTokenId } from "./domain/entities/refresh-token.js";
 export { RefreshToken } from "./domain/entities/refresh-token.js";
 
 // Domain: value objects
 export { SessionExpiryPolicy } from "./domain/value-objects/session-expiry-policy.js";
-export {
-  generateToken,
-  hashToken,
-  tokenMatchesDigest,
-} from "./domain/value-objects/token-digest.js";
 
 // Domain: events
 export { RefreshTokenReuseDetected } from "./domain/events/refresh-token-reuse-detected.js";
@@ -32,12 +19,15 @@ export { RefreshTokenReuseDetected } from "./domain/events/refresh-token-reuse-d
 // Application: ports (for infrastructure adapters to implement)
 export type { SessionRepository } from "./application/ports/session-repository.js";
 export type { AccessTokenPayload, TokenSigner } from "./application/ports/token-signer.js";
-export type { IssuedAccessToken, TokenSigner } from "./application/ports/token-signer.js";
 export type { RevocationList } from "./application/ports/revocation-list.js";
 export type { SessionAuditLogger } from "./application/ports/session-audit-logger.js";
 
 // Application: use cases
-export type { IssueSessionCommand, IssuedSession, IssueSessionError } from "./application/use-cases/issue-session.js";
+export type {
+  IssueSessionCommand,
+  IssuedSession,
+  IssueSessionError,
+} from "./application/use-cases/issue-session.js";
 export { IssueSession } from "./application/use-cases/issue-session.js";
 export type {
   RefreshAccessTokenCommand,
@@ -57,29 +47,16 @@ export type {
   ListActiveSessionsError,
   SessionSummary,
 } from "./application/use-cases/list-active-sessions.js";
-export {
-  IssueSession,
-  type IssueSessionCommand,
-  type IssueSessionResult,
-} from "./application/use-cases/issue-session.js";
-export {
-  RefreshAccessToken,
-  type RefreshAccessTokenCommand,
-  type RefreshAccessTokenResult,
-} from "./application/use-cases/refresh-access-token.js";
-export { Logout, type LogoutCommand } from "./application/use-cases/logout.js";
-export {
-  LogoutEverywhere,
-  type LogoutEverywhereCommand,
-  type LogoutEverywhereResult,
-} from "./application/use-cases/logout-everywhere.js";
 export { ListActiveSessions } from "./application/use-cases/list-active-sessions.js";
 
-// Infrastructure: adapters (Exported so the composition root can construct them)
+// Infrastructure: adapters (exported so the composition root can construct them)
 export { PrismaSessionRepository } from "./infrastructure/persistence/prisma-session-repository.js";
 export { JwtTokenSigner } from "./infrastructure/jwt-token-signer.js";
 export { SigningKeyProvider } from "./infrastructure/signing-key-provider.js";
-export { RedisRevocationList } from "./infrastructure/redis-revocation-list.js";
+export {
+  RedisRevocationList,
+  type RedisRevocationListOptions,
+} from "./infrastructure/redis-revocation-list.js";
 export { SessionsPackageRevoker } from "./infrastructure/session-revoker-adapter.js";
 
 // Testing fakes
