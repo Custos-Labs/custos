@@ -1,7 +1,14 @@
+import { createId } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
 import type { RevocationList } from "../../../application/ports/revocation-list.js";
-import { createSessionId } from "../../../domain/value-objects/session-id.js";
+import type { SessionId } from "../../../domain/entities/session.js";
+
+function createSessionId(): SessionId {
+  return createId<"SessionId">();
+}
+
+const ONE_MINUTE_MS = 60 * 1000;
 
 /**
  * Behavioral contract every {@link RevocationList} implementation must satisfy —
@@ -31,7 +38,7 @@ export function revocationListContract(
       const list = await createList();
       const sessionId = createSessionId();
 
-      await list.revoke(sessionId, 60);
+      await list.revoke(sessionId, new Date(Date.now() + ONE_MINUTE_MS));
 
       await expect(list.isRevoked(sessionId)).resolves.toBe(true);
     });
@@ -41,7 +48,7 @@ export function revocationListContract(
       const revoked = createSessionId();
       const untouched = createSessionId();
 
-      await list.revoke(revoked, 60);
+      await list.revoke(revoked, new Date(Date.now() + ONE_MINUTE_MS));
 
       await expect(list.isRevoked(revoked)).resolves.toBe(true);
       await expect(list.isRevoked(untouched)).resolves.toBe(false);
@@ -51,21 +58,10 @@ export function revocationListContract(
       const list = await createList();
       const sessionId = createSessionId();
 
-      await list.revoke(sessionId, 60);
-      await list.revoke(sessionId, 60);
+      await list.revoke(sessionId, new Date(Date.now() + ONE_MINUTE_MS));
+      await list.revoke(sessionId, new Date(Date.now() + ONE_MINUTE_MS));
 
       await expect(list.isRevoked(sessionId)).resolves.toBe(true);
-    });
-
-    it("treats a non-positive TTL as nothing to deny", async () => {
-      const list = await createList();
-      const sessionId = createSessionId();
-
-      await list.revoke(sessionId, 0);
-      await expect(list.isRevoked(sessionId)).resolves.toBe(false);
-
-      await list.revoke(sessionId, -5);
-      await expect(list.isRevoked(sessionId)).resolves.toBe(false);
     });
   });
 }

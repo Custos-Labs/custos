@@ -2,73 +2,36 @@ import type { RevocationList } from "../../application/ports/revocation-list.js"
 import type { SessionId } from "../../domain/entities/session.js";
 
 /**
- * A `RevocationList` backed by an in-memory `Map`, satisfying the exact same
- * port `RedisRevocationList` does. Exists so use cases and their tests never
- * need a Redis instance — see `InMemorySessionRepository` for the same
+ * An in-memory {@link RevocationList} for unit-testing anything that revokes
+ * or checks sessions, without a Redis. Satisfies the exact same port
+ * `RedisRevocationList` does — see `InMemorySessionRepository` for the same
  * reasoning applied to persistence.
+ *
+ * Checks `until` against an injectable clock on every `isRevoked` call
+ * rather than relying on a TTL store to self-expire, and lazily evicts past
+ * entries — mirroring how Redis drops a key once its `PX` elapses. The clock
+ * defaults to the real one; tests that need to cross an expiry boundary
+ * without sleeping can supply their own.
  */
 export class InMemoryRevocationList implements RevocationList {
   private readonly revokedUntilBySessionId = new Map<SessionId, Date>();
 
-  revoke(sessionId: SessionId, until: Date): Promise<void> {
-    this.revokedUntilBySessionId.set(sessionId, until);
-import type { SessionId } from "../../domain/value-objects/session-id.js";
-
-/**
- * An in-memory {@link RevocationList} for unit-testing anything that revokes or
- * checks sessions, without a Redis. It honors TTLs against an injectable clock,
- * so expiry can be tested deterministically instead of by sleeping.
- *
- * It passes the same {@link import("./contracts/revocation-list.contract.js").revocationListContract | contract suite}
- * the Redis adapter does — the guarantee that "tested with the fake" means the
- * same thing as "tested with the real store," see `docs/guides/testing.md`.
- *
- * It does *not* model the Redis adapter's fail-closed behavior, because an
- * in-memory map has no unreachable state to fail from. That behavior is the one
- * thing genuinely specific to the Redis adapter and is tested there.
- */
-export class InMemoryRevocationList implements RevocationList {
-  /** sessionId → epoch-millis at which the entry expires. */
-  private readonly entries = new Map<string, number>();
-
   constructor(private readonly now: () => number = () => Date.now()) {}
 
-  revoke(sessionId: SessionId, ttlSeconds: number): Promise<void> {
-    if (ttlSeconds <= 0) {
-      return Promise.resolve();
-    }
-    this.entries.set(sessionId, this.now() + ttlSeconds * 1000);
+  revoke(sessionId: SessionId, until: Date): Promise<void> {
+    this.revokedUntilBySessionId.set(sessionId, until);
     return Promise.resolve();
   }
 
   isRevoked(sessionId: SessionId): Promise<boolean> {
-    return Promise.resolve(this.revokedUntilBySessionId.has(sessionId));
-    const expiresAt = this.entries.get(sessionId);
-    if (expiresAt === undefined) {
+    const until = this.revokedUntilBySessionId.get(sessionId);
+    if (until === undefined) {
       return Promise.resolve(false);
     }
-    if (expiresAt <= this.now()) {
-      // Lazily evict, mirroring how Redis drops the key once its EX elapses.
-      this.entries.delete(sessionId);
+    if (until.getTime() <= this.now()) {
+      this.revokedUntilBySessionId.delete(sessionId);
       return Promise.resolve(false);
     }
     return Promise.resolve(true);
-
-/**
- * A `RevocationList` backed by an in-memory `Map`, satisfying the exact same
- * port a real (Redis-backed) adapter will. Exists so `Logout`,
- * `LogoutEverywhere`, and `IssueSession`'s eviction path never need Redis in
- * their unit tests.
- */
-export class InMemoryRevocationList implements RevocationList {
-  private readonly expiresAtByTokenId = new Map<string, Date>();
-
-  revoke(tokenId: string, expiresAt: Date): Promise<void> {
-    this.expiresAtByTokenId.set(tokenId, expiresAt);
-    return Promise.resolve();
-  }
-
-  isRevoked(tokenId: string): Promise<boolean> {
-    return Promise.resolve(this.expiresAtByTokenId.has(tokenId));
   }
 }

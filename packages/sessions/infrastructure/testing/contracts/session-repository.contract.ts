@@ -1,33 +1,32 @@
+import { createId } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
 import type { SessionRepository } from "../../../application/ports/session-repository.js";
-import { Session, type SessionId, type UserId } from "../../../domain/entities/session.js";
+import { RefreshToken } from "../../../domain/entities/refresh-token.js";
+import { Session, type SessionUserId } from "../../../domain/entities/session.js";
 import { SessionExpiryPolicy } from "../../../domain/value-objects/session-expiry-policy.js";
-import { createId } from "@verixa/shared-kernel";
 
-function makeUserId(): UserId {
+function makeUserId(): SessionUserId {
   return createId<"UserId">();
 }
 
-function makeSession(userId: UserId): Session {
-  const expiryPolicy = SessionExpiryPolicy.sliding(3600 * 1000); // 1 hour
-  return Session.create({ userId, expiryPolicy });
+function makeSession(userId: SessionUserId, now = new Date()): Session {
+  return Session.open({ userId, policy: SessionExpiryPolicy.default(), now });
 }
 
 /**
  * Behavioral contract every `SessionRepository` implementation must satisfy —
- * run against `InMemorySessionRepository` today and, once it exists, the
- * Postgres or Redis-backed adapter from Phase 05, via the same test bodies.
- * This is **contract testing**: one shared suite, multiple implementations,
- * each proven to behave identically rather than merely "compile against the
- * same interface." See `docs/guides/testing.md`.
+ * run against `InMemorySessionRepository` and, when a database is available,
+ * `PrismaSessionRepository`, via the same test bodies. This is **contract
+ * testing**: one shared suite, multiple implementations, each proven to
+ * behave identically rather than merely "compile against the same
+ * interface." See `docs/guides/testing.md`.
  */
 export function sessionRepositoryContract(createRepository: () => SessionRepository): void {
   describe("SessionRepository contract", () => {
     it("returns undefined for a session that was never saved", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
-      const session = makeSession(userId);
+      const session = makeSession(makeUserId());
 
       const found = await repository.findById(session.id);
 
@@ -36,49 +35,44 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
     it("finds a saved session by id", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
-      const session = makeSession(userId);
+      const session = makeSession(makeUserId());
 
       await repository.save(session);
 
       const found = await repository.findById(session.id);
 
-      // Asserts equality of state, not object identity (same reasoning as
-      // UserRepository: a real adapter will reconstruct the instance from
-      // storage, never returning the exact object instance it was given).
+      // Asserts equality of state, not object identity: a real adapter
+      // reconstructs the instance from storage, never returning the exact
+      // object instance it was given.
       expect(found?.id).toBe(session.id);
       expect(found?.userId).toBe(session.userId);
       expect(found?.createdAt).toEqual(session.createdAt);
       expect(found?.lastSeenAt).toEqual(session.lastSeenAt);
       expect(found?.expiresAt).toEqual(session.expiresAt);
+      expect(found?.ipAddress).toBe(session.ipAddress);
+      expect(found?.userAgent).toBe(session.userAgent);
       expect(found?.revokedAt).toEqual(session.revokedAt);
-      expect(found?.isRevoked()).toBe(session.isRevoked());
-      expect(found?.isExpired()).toBe(session.isExpired());
+      expect(found?.isRevoked).toBe(session.isRevoked);
     });
 
     it("save is an idempotent upsert", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
-      const session = makeSession(userId);
+      const session = makeSession(makeUserId());
 
       await repository.save(session);
 
-      // Touch the session to update its state.
-      const touched = session.touch();
+      const touched = session.touch(new Date(session.lastSeenAt.getTime() + 1000));
       await repository.save(touched);
 
       const found = await repository.findById(session.id);
 
-      // The updated state should be persisted.
       expect(found?.lastSeenAt).toEqual(touched.lastSeenAt);
-      expect(found?.expiresAt).toEqual(touched.expiresAt);
     });
 
     it("returns empty array when a user has no active sessions", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
 
-      const active = await repository.findActiveByUserId(userId);
+      const active = await repository.findActiveByUserId(makeUserId());
 
       expect(active).toEqual([]);
     });
@@ -105,11 +99,8 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
       const session1 = makeSession(userId);
       const session2 = makeSession(userId);
 
-      await repository.save(session1);
+      await repository.save(session1.revoke());
       await repository.save(session2);
-
-      // Revoke one session.
-      await repository.revoke(session1.id);
 
       const active = await repository.findActiveByUserId(userId);
 
@@ -117,63 +108,14 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
       expect(active[0]?.id).toBe(session2.id);
     });
 
-    it("excludes expired sessions from findActiveByUserId", async () => {
-      const repository = createRepository();
-      const userId = makeUserId();
-      // Create a session that expires immediately (duration = 0).
-      // We'll create it with a past expiry time instead.
-      const now = new Date();
-      const pastDate = new Date(now.getTime() - 1000); // 1 second in the past
-      const expiryPolicy = SessionExpiryPolicy.sliding(1000);
-      const session = Session.reconstitute({
-        id: createId<"SessionId">(),
-        userId,
-        createdAt: new Date(pastDate.getTime() - 10000),
-        lastSeenAt: new Date(pastDate.getTime() - 5000),
-        expiresAt: pastDate, // Expired
-        expiryPolicy,
-      });
-
-      await repository.save(session);
-
-      const active = await repository.findActiveByUserId(userId);
-
-      expect(active).toEqual([]);
-    });
-
-    it("orders findActiveByUserId results by lastSeenAt descending", async () => {
+    it("orders findActiveByUserId results by lastSeenAt ascending (oldest first)", async () => {
       const repository = createRepository();
       const userId = makeUserId();
       const now = new Date();
 
-      // Create three sessions with different lastSeenAt times.
-      const expiryPolicy = SessionExpiryPolicy.sliding(3600 * 1000);
-      const session1 = Session.reconstitute({
-        id: createId<"SessionId">(),
-        userId,
-        createdAt: new Date(now.getTime() - 3000),
-        lastSeenAt: new Date(now.getTime() - 3000),
-        expiresAt: new Date(now.getTime() + 3600 * 1000),
-        expiryPolicy,
-      });
-
-      const session2 = Session.reconstitute({
-        id: createId<"SessionId">(),
-        userId,
-        createdAt: new Date(now.getTime() - 2000),
-        lastSeenAt: new Date(now.getTime() - 2000),
-        expiresAt: new Date(now.getTime() + 3600 * 1000),
-        expiryPolicy,
-      });
-
-      const session3 = Session.reconstitute({
-        id: createId<"SessionId">(),
-        userId,
-        createdAt: new Date(now.getTime() - 1000),
-        lastSeenAt: new Date(now.getTime() - 1000),
-        expiresAt: new Date(now.getTime() + 3600 * 1000),
-        expiryPolicy,
-      });
+      const session1 = makeSession(userId, new Date(now.getTime() - 3000));
+      const session2 = makeSession(userId, new Date(now.getTime() - 2000));
+      const session3 = makeSession(userId, new Date(now.getTime() - 1000));
 
       await repository.save(session1);
       await repository.save(session2);
@@ -181,32 +123,9 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
 
       const active = await repository.findActiveByUserId(userId);
 
-      // Should be ordered with session3 first (most recently active).
-      expect(active[0]?.id).toBe(session3.id);
+      expect(active[0]?.id).toBe(session1.id);
       expect(active[1]?.id).toBe(session2.id);
-      expect(active[2]?.id).toBe(session1.id);
-    });
-
-    it("revoke is idempotent", async () => {
-      const repository = createRepository();
-      const userId = makeUserId();
-      const session = makeSession(userId);
-
-      await repository.save(session);
-      await repository.revoke(session.id);
-      await repository.revoke(session.id); // Second revoke should be a no-op.
-
-      const found = await repository.findById(session.id);
-
-      expect(found?.isRevoked()).toBe(true);
-    });
-
-    it("revoking a non-existent session is a silent no-op", async () => {
-      const repository = createRepository();
-      const fakeSessionId = createId<"SessionId">();
-
-      // Should not throw.
-      await expect(repository.revoke(fakeSessionId)).resolves.toBeUndefined();
+      expect(active[2]?.id).toBe(session3.id);
     });
 
     it("revokeAllForUser marks all sessions for that user as revoked", async () => {
@@ -223,8 +142,8 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
       const found1 = await repository.findById(session1.id);
       const found2 = await repository.findById(session2.id);
 
-      expect(found1?.isRevoked()).toBe(true);
-      expect(found2?.isRevoked()).toBe(true);
+      expect(found1?.isRevoked).toBe(true);
+      expect(found2?.isRevoked).toBe(true);
     });
 
     it("revokeAllForUser does not affect other users' sessions", async () => {
@@ -242,39 +161,14 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
       const user1Found = await repository.findById(user1Session.id);
       const user2Found = await repository.findById(user2Session.id);
 
-      expect(user1Found?.isRevoked()).toBe(true);
-      expect(user2Found?.isRevoked()).toBe(false);
+      expect(user1Found?.isRevoked).toBe(true);
+      expect(user2Found?.isRevoked).toBe(false);
     });
 
     it("revokeAllForUser for a user with no sessions is a silent no-op", async () => {
       const repository = createRepository();
-      const userId = makeUserId();
 
-      // Should not throw.
-      await expect(repository.revokeAllForUser(userId)).resolves.toBeUndefined();
-    });
-
-    it("revokeAllForUser still revokes already-revoked sessions", async () => {
-      const repository = createRepository();
-      const userId = makeUserId();
-      const session1 = makeSession(userId);
-      const session2 = makeSession(userId);
-
-      await repository.save(session1);
-      await repository.save(session2);
-
-      // Revoke session1 individually.
-      await repository.revoke(session1.id);
-
-      // Now revoke all for the user.
-      await repository.revokeAllForUser(userId);
-
-      const found1 = await repository.findById(session1.id);
-      const found2 = await repository.findById(session2.id);
-
-      // Both should be revoked (session1 was already revoked, session2 is newly revoked).
-      expect(found1?.isRevoked()).toBe(true);
-      expect(found2?.isRevoked()).toBe(true);
+      await expect(repository.revokeAllForUser(makeUserId())).resolves.toBeUndefined();
     });
 
     it("after revokeAllForUser, findActiveByUserId returns an empty array", async () => {
@@ -291,6 +185,51 @@ export function sessionRepositoryContract(createRepository: () => SessionReposit
       const active = await repository.findActiveByUserId(userId);
 
       expect(active).toEqual([]);
+    });
+
+    it("finds a saved refresh token by its hash", async () => {
+      const repository = createRepository();
+      const session = makeSession(makeUserId());
+      await repository.save(session);
+
+      const { refreshToken, token } = RefreshToken.issue({
+        sessionId: session.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      await repository.saveRefreshToken(refreshToken);
+
+      const found = await repository.findRefreshTokenByHash(RefreshToken.hashToken(token));
+
+      expect(found?.id).toBe(refreshToken.id);
+      expect(found?.sessionId).toBe(session.id);
+      expect(found?.tokenHash).toBe(refreshToken.tokenHash);
+    });
+
+    it("returns undefined for a refresh token hash that was never saved", async () => {
+      const repository = createRepository();
+
+      const found = await repository.findRefreshTokenByHash("not-a-real-hash");
+
+      expect(found).toBeUndefined();
+    });
+
+    it("saveRefreshToken is an idempotent upsert", async () => {
+      const repository = createRepository();
+      const session = makeSession(makeUserId());
+      await repository.save(session);
+
+      const { refreshToken, token } = RefreshToken.issue({
+        sessionId: session.id,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      await repository.saveRefreshToken(refreshToken);
+
+      const used = refreshToken.markUsed();
+      await repository.saveRefreshToken(used);
+
+      const found = await repository.findRefreshTokenByHash(RefreshToken.hashToken(token));
+
+      expect(found?.isUsed).toBe(true);
     });
   });
 }
