@@ -144,21 +144,35 @@ describe.skipIf(!available)("PrismaSessionRepository (Issue 083)", () => {
     });
 
     it("sessions_expires_at_idx is used for expiry sweep queries", async () => {
+      // On a tiny table Postgres correctly prefers a sequential scan -- reading
+      // a handful of heap pages beats descending a B-tree and then visiting
+      // the heap anyway. Seeding past the point a scan stops being cheap, and
+      // keeping the expired row a small minority, is what makes this a test
+      // of the index rather than of table size. Same reasoning as
+      // docs/performance/audit-query-benchmarks.md.
       const userId = await setupUser();
       const now = new Date();
-      const expiredSession = Session.reconstitute({
+      const rowCount = 2000;
+
+      const rows = Array.from({ length: rowCount }, (_unused, offset) => ({
         id: createId<"SessionId">(),
         userId,
         createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
         lastSeenAt: new Date(now.getTime() - 60 * 60 * 1000),
-        expiresAt: new Date(now.getTime() - 30 * 60 * 1000),
-        ipAddress: undefined,
-        userAgent: undefined,
-        revokedAt: undefined,
-      });
+        // Only the first row is already expired; the rest expire far in the
+        // future, so "expires_at < now()" matches a small, selective slice.
+        expiresAt:
+          offset === 0
+            ? new Date(now.getTime() - 30 * 60 * 1000)
+            : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000 + offset * 1000),
+        ipAddress: null,
+        userAgent: null,
+        revokedAt: null,
+      }));
 
-      createdSessionIds.push(expiredSession.id);
-      await new PrismaSessionRepository(prisma).save(expiredSession);
+      createdSessionIds.push(...rows.map((row) => row.id));
+      await prisma.session.createMany({ data: rows });
+      await prisma.$executeRawUnsafe("ANALYZE sessions;");
 
       const explainResult = await prisma.$queryRawUnsafe<{ "QUERY PLAN": string }[]>(
         `EXPLAIN (FORMAT JSON, ANALYZE)
