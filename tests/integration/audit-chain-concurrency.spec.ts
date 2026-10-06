@@ -57,6 +57,14 @@ import { createTestPrismaClient, databaseAvailability } from "./helpers/database
 
 const available = await databaseAvailability();
 
+// actorId is `@db.Uuid`; Postgres rejects anything that isn't a real UUID
+// rather than storing it as an opaque string, so these must be valid UUIDs,
+// not readable labels.
+const RACER_A_ID = "00000000-0000-4000-9000-00000000a001";
+const RACER_B_ID = "00000000-0000-4000-9000-00000000a002";
+const RIVAL_ID = "00000000-0000-4000-9000-00000000a003";
+const FORK_ID = "00000000-0000-4000-9000-00000000a004";
+
 describe.skipIf(!available)("audit chain concurrency (Issue #128)", () => {
   const prisma = createTestPrismaClient();
 
@@ -102,17 +110,11 @@ describe.skipIf(!available)("audit chain concurrency (Issue #128)", () => {
     // claims sequence 1 and links to the genesis hash. Only one can commit; the
     // loser is expected to re-read and relink, which is what separates a
     // retryable conflict from a lost event.
-    const recorder = new RecordAuditEvent(repository, (error) => {
-      // Diagnostic only: `RecordAuditEvent` swallows every failure by
-      // design (see its class doc), which is right for production but
-      // means a genuine bug here reports as a silent `undefined` with no
-      // trace of why. Surface it while this suite is under investigation.
-      console.error("RecordAuditEvent swallowed an error:", error);
-    });
+    const recorder = new RecordAuditEvent(repository);
 
     const results = await Promise.all([
-      recorder.execute({ action: "user.login_succeeded", actorId: "racer-a" }),
-      recorder.execute({ action: "user.login_failed", actorId: "racer-b" }),
+      recorder.execute({ action: "user.login_succeeded", actorId: RACER_A_ID }),
+      recorder.execute({ action: "user.login_failed", actorId: RACER_B_ID }),
     ]);
 
     expect(results.filter((entry) => entry !== undefined)).toHaveLength(2);
@@ -132,7 +134,7 @@ describe.skipIf(!available)("audit chain concurrency (Issue #128)", () => {
     // The chain moves under the caller's feet.
     const rival = await new RecordAuditEvent(repository).execute({
       action: "user.login_succeeded",
-      actorId: "rival",
+      actorId: RIVAL_ID,
     });
     expect(rival).toBeDefined();
 
@@ -141,7 +143,7 @@ describe.skipIf(!available)("audit chain concurrency (Issue #128)", () => {
     // `verifyChain` could no longer tell which history is the real one.
     const forked = AuditLogEntry.append({
       action: "user.locked_out",
-      actorId: "fork",
+      actorId: FORK_ID,
       previous: head,
     });
 
