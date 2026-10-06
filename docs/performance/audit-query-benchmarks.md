@@ -4,8 +4,8 @@ Evidence for Issue 188 — the audit log's read paths stay index-backed as the
 table grows. Recorded with `pnpm db:benchmark:audit` (alias for
 `BENCH_ROWS=100000 pnpm --filter @verixa/database run benchmark:audit`).
 
-This is the large, manual companion to
-`tests/integration/audit-query-index-usage.spec.ts`, which asserts the same
+This is the large, manual companion to the "audit query index usage" suite in
+`tests/integration/audit-chain-concurrency.spec.ts`, which asserts the same
 paths use an index at a few thousand rows in CI. The test is the gate; this
 script seeds six figures and prints `EXPLAIN (ANALYZE, BUFFERS)` for each path,
 because the planner changes strategy at scale and a path that indexes at 5k
