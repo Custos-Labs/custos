@@ -1,8 +1,10 @@
-# Verixa
+# Custos
+
+![Stellar](https://img.shields.io/badge/Stellar-Soroban-7D00FF?logo=stellar&logoColor=white)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Verixa is open-source infrastructure for **authentication, authorization,
+Custos is open-source infrastructure for **authentication, authorization,
 identity, verification, audit logging, security, and governance** — built to be
 production-ready and, at the same time, a complete educational resource for
 learning backend engineering, software architecture, and security best practices.
@@ -17,19 +19,29 @@ composed together by the HTTP API in `apps/api`.
 > [Roadmap](#roadmap). Sessions (Phase 05) are the next milestone and the
 > current limitation: login authenticates a user but does not yet issue a token.
 
-## Why Verixa
+## Table of Contents
+
+- [Why Custos](#why-custos)
+- [Verifiable audit logging on Stellar](#verifiable-audit-logging-on-stellar)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Quickstart](#quickstart)
+- [Security](#security)
+- [Contributing](#contributing)
+
+## Why Custos
 
 Most auth/identity building blocks are either a SaaS you pay for and can't audit,
-or a snippet you copy-paste and never fully understand. Verixa aims to be neither:
+or a snippet you copy-paste and never fully understand. Custos aims to be neither:
 a codebase you can read end to end, run yourself, and learn real architecture and
 security practice from — while still being solid enough to build on.
 
 ## Verifiable audit logging on Stellar
 
-Verixa's audit log is **hash-chained** — every entry commits to its
+Custos's audit log is **hash-chained** — every entry commits to its
 predecessor, so altering or removing one breaks every hash after it.
 
-That alone is weaker than it sounds, and Verixa says so rather than claiming
+That alone is weaker than it sounds, and Custos says so rather than claiming
 otherwise. An attacker with write access to the database can rewrite the chain
 from any point and re-derive every subsequent hash; the result is internally
 consistent and indistinguishable from the truth. Hash chaining makes a log
@@ -49,7 +61,7 @@ access to, and no trust in, the operator's systems.
 
 ```bash
 pnpm install
-pnpm --filter @verixa/audit demo
+pnpm --filter @custos/audit demo
 ```
 
 (The demo builds the packages it needs first, so this is genuinely the whole
@@ -101,7 +113,7 @@ See `docs/adr/0003-stellar-audit-anchoring.md` for the full rationale.
 
 ## Architecture
 
-Verixa is a TypeScript pnpm-workspaces monorepo following Clean Architecture and
+Custos is a TypeScript pnpm-workspaces monorepo following Clean Architecture and
 Domain-Driven Design: domain logic has no dependency on frameworks or databases,
 and each bounded context (identity, credentials, sessions, authorization,
 verification, audit, governance, notifications) lives in its own package.
@@ -113,7 +125,7 @@ on gets its own ADR — see [`docs/adr/0000-adr-process.md`](docs/adr/0000-adr-p
 for the process.
 
 ```
-verixa/
+custos/
 ├── apps/api/        # Fastify HTTP app (composition root)
 ├── packages/        # Bounded-context packages (domain/application/infrastructure/interface)
 ├── infra/           # Deployment & infrastructure config
@@ -130,7 +142,7 @@ verixa/
 
 ```bash
 pnpm install
-pnpm --filter @verixa/api dev
+pnpm --filter @custos/api dev
 ```
 
 `pnpm install` also generates the Prisma client, which is platform-specific
@@ -168,9 +180,16 @@ pnpm format      # auto-fix formatting with Prettier
 See [`docs/guides/code-style.md`](docs/guides/code-style.md) for what the
 linter checks and why.
 
+## Security
+
+- **Never commit secrets** — keep keys, seed phrases, and `.env` files out of source control.
+- **Testnet values have no real-world value**; treat testnet deployments as experimental.
+- **Keys never leave the wallet** — signing is delegated to the user's Stellar wallet; the app does not store secret keys.
+- Report vulnerabilities per `SECURITY.md` where present rather than opening a public issue.
+
 ## Contributing
 
-Verixa isn't yet open for external contribution — the initial architecture and
+Custos isn't yet open for external contribution — the initial architecture and
 foundational tooling are still being laid down. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the local developer workflow so far.
 A `CODE_OF_CONDUCT.md` and issue/PR templates will land as part of the
