@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege: no job in this workflow writes back to GitHub — no
+# releases, no PR comments, no registry pushes — so the default token is
+# read-only. If a future job needs to write, grant it a job-level
+# `permissions:` block rather than widening this one.
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
