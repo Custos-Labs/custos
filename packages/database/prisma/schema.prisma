@@ -199,6 +199,7 @@ model Organization {
   memberships          OrganizationMembership[]
   invitations          Invitation[]
   verificationRequests VerificationRequest[]    @relation("VerificationRequestOrganization")
+  roleAssignments      UserRoleAssignment[]
 
   @@map("organizations")
 }
@@ -631,6 +632,13 @@ model UserRoleAssignment {
   /// silently removing access records that may be needed for an audit trail.
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  /// FK to `organizations` — `Restrict`, for the same reason as the `user`
+  /// relation above: deleting an organization that still has role assignments
+  /// must fail rather than silently removing access records that may be needed
+  /// for an audit trail. Assignments are revoked explicitly when an org is
+  /// decommissioned, never as a side effect of deleting the org.
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   /// Composite (userId, orgId): the hot path — "what roles does this user
   /// hold in this org" — is a point lookup on exactly these two columns.
