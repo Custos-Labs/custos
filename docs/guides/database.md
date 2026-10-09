@@ -1,8 +1,8 @@
 # Database
 
-Verixa uses PostgreSQL. This guide covers what's set up so far (Issue 041:
-provisioning, connectivity, dev/test isolation) — it grows through Phase 03
-as Prisma, migrations, and real repositories land.
+Verixa uses PostgreSQL. This guide covers the database architecture, Prisma
+schema, the ordered migration history under `packages/database/prisma/migrations/`,
+and repository implementations.
 
 ## Local Postgres
 
@@ -213,11 +213,12 @@ replayed**. That matters for three things `db push` can't do:
    _between_ two structural states, which only exists in a migration-based
    workflow.
 
-Verixa sets this workflow up in Issue 042, **before any table exists**,
+Verixa set this workflow up in Issue 042, **before any table existed**,
 deliberately. Retrofitting migration history onto a database that was built
 by schema sync means reconstructing a history nobody recorded — so the
-cheapest possible moment to establish it is when there's nothing to
-reconstruct.
+cheapest possible moment to establish it was when there was nothing to
+reconstruct. Since Issue 043, every structural change has been tracked as
+an ordered migration under `packages/database/prisma/migrations/`.
 
 CI runs `db:migrate:deploy` on every push, applying every migration in
 order against a fresh Postgres service container — so a migration that
@@ -612,11 +613,13 @@ block never executes — the first version of this guard silently did nothing
 in precisely the situation it existed to catch. Module evaluation always
 runs, so throwing there fails collection reliably.
 
-## What's next (Phase 03)
+## Migration History & Evolution
 
-- **Issues 044–045**: tables for `Organization`/`OrganizationMembership`
-  and `Invitation`.
-- **Issue 046+**: real, Prisma-backed repositories satisfying the ports
-  from Phase 02, validated against the contract test suite from Issue 031.
-- **Issue 047**: Testcontainers, replacing the shared `verixa_test`
-  database above with fully ephemeral per-test-run containers.
+The schema has evolved through ordered migrations under `packages/database/prisma/migrations/`:
+
+- **Phase 03 baseline**: tables for `users`, `organizations`, `organization_memberships`,
+  `invitations`, and Row-Level Security policies.
+- **Authentication & Sessions**: `credentials`, token tables, session storage, and password history.
+- **Audit & Governance**: `audit_logs`, cryptographic anchors, and query performance indexes.
+- **RBAC & Verification**: `roles`, `permissions`, `role_permissions`, `user_role_assignments`,
+  MFA tables, verification requests, and policy versions.
