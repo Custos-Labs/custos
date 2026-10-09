@@ -85,6 +85,7 @@ export {
   type AuthenticateWithPasswordCommand,
   type AuthenticateWithPasswordError,
   type AuthenticateWithPasswordResult,
+  type MfaChecker,
 } from "./application/use-cases/authenticate-with-password.js";
 export {
   RegisterUserWithPassword,
