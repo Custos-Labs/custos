@@ -78,6 +78,17 @@ export class LocalTransactionSigner implements TransactionSigner {
 }
 
 /**
+ * Derives the G... public key from an S... secret without constructing a signer.
+ *
+ * For deployments (like the API composition root) that need to *name* the
+ * anchoring account — e.g. for the funding guard — where the secret is
+ * available but no signer instance exists yet.
+ */
+export function publicKeyFromSecret(secretKey: string): string {
+  return Keypair.fromSecret(secretKey).publicKey();
+}
+
+/**
  * The SDK's Ed25519 layer takes a `Buffer`; the port speaks `Uint8Array` so no
  * caller has to depend on Node's buffer type in order to sign something.
  */

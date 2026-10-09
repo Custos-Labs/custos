@@ -52,9 +52,15 @@ import {
   type DomainEventPublisher,
 } from "@verixa/shared-kernel";
 import {
+  AnchorBalanceMonitor,
+  HorizonAccountBalanceReader,
   LocalTransactionSigner,
   StellarHashAnchor,
+  loggingFundingAlerter,
+  publicKeyFromSecret,
+  type AnchorFundingGuard,
   type StellarNetwork,
+  type StructuredErrorLogger,
   type TransactionSigner,
 } from "@verixa/stellar-anchor";
 
@@ -195,6 +201,25 @@ function resolveSigner(
   return new LocalTransactionSigner(secretKey);
 }
 
+/**
+ * Names the anchoring account for the funding guard.
+ *
+ * Explicit configuration wins — same precedence as the CLI's `balance`
+ * command. Otherwise the local-development secret is derivable without
+ * network access. (The public-network refusal for env secrets already
+ * happened in resolveSigner, so reaching the derivation branch means local
+ * signing is permitted on this network.)
+ */
+function resolveAnchorPublicKey(): string | undefined {
+  const fromEnv = process.env["STELLAR_ANCHOR_PUBLIC_KEY"];
+  if (fromEnv !== undefined && fromEnv !== "") return fromEnv;
+
+  const secret = process.env["STELLAR_ANCHOR_SECRET_KEY"];
+  if (secret !== undefined && secret !== "") return publicKeyFromSecret(secret);
+
+  return undefined;
+}
+
 /** Every use case the application exposes, fully wired. */
 export interface IdentityUseCases {
   readonly registerUser: RegisterUser;
@@ -274,6 +299,11 @@ export interface ContainerOverrides {
    * problem back where it started.
    */
   readonly signer?: TransactionSigner | undefined;
+  /**
+   * An optional logger for operational alerts (e.g. funding guard alerts).
+   * Defaults to `console`.
+   */
+  readonly logger?: StructuredErrorLogger | undefined;
 }
 
 /**
@@ -381,8 +411,43 @@ export function buildContainer(
   const stellarNetwork: StellarNetwork =
     process.env["STELLAR_NETWORK"] === "public" ? "public" : "testnet";
   const signer = resolveSigner(overrides, stellarNetwork);
+
+  // Pre-flight balance check prevents burns when the signing account is
+  // under-funded (Issue #94). We need an explicit account id to query
+  // Horizon: for a local signer we derive it from the secret; for KMS the
+  // operator must supply STELLAR_ANCHOR_PUBLIC_KEY.
+  let fundingGuard: AnchorFundingGuard | undefined;
+  if (signer !== undefined) {
+    const anchorPublicKey = resolveAnchorPublicKey();
+    const fundingLogger = overrides.logger ?? console;
+
+    if (anchorPublicKey === undefined) {
+      // KMS without an explicit STELLAR_ANCHOR_PUBLIC_KEY: the signing
+      // account cannot be named synchronously (signer.accountId() is async and
+      // the composition root is sync). Anchoring still works, but unwatched —
+      // said loudly once at startup rather than silently.
+      fundingLogger.error({
+        type: "anchor_funding_guard_disabled",
+        reason: "STELLAR_ANCHOR_PUBLIC_KEY is not set",
+      });
+    } else {
+      const thresholdXlm = Number(process.env["STELLAR_ANCHOR_MIN_XLM"] ?? "1");
+      if (!Number.isFinite(thresholdXlm) || thresholdXlm < 0) {
+        throw new Error("STELLAR_ANCHOR_MIN_XLM must be a non-negative number of XLM.");
+      }
+      fundingGuard = new AnchorBalanceMonitor({
+        reader: new HorizonAccountBalanceReader({ network: stellarNetwork }),
+        publicKey: anchorPublicKey,
+        thresholdXlm,
+        alerter: loggingFundingAlerter(fundingLogger),
+      });
+    }
+  }
+
   const hashAnchor =
-    signer === undefined ? undefined : new StellarHashAnchor({ signer, network: stellarNetwork });
+    signer === undefined
+      ? undefined
+      : new StellarHashAnchor({ signer, network: stellarNetwork, fundingGuard });
 
   // Multi-factor authentication (MFA) use cases and WebAuthn verifier adapters.
   const webauthnRpId = process.env["WEBAUTHN_RP_ID"] ?? "localhost";

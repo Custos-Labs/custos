@@ -9,7 +9,7 @@ import { transactionSignerContract } from "../testing/contracts/transaction-sign
 import { fakeKmsClient } from "../testing/fake-kms-sign-client.js";
 
 import { KmsTransactionSigner } from "./kms-transaction-signer.js";
-import { LocalTransactionSigner } from "./local-transaction-signer.js";
+import { LocalTransactionSigner, publicKeyFromSecret } from "./local-transaction-signer.js";
 
 const KEY_ID = "alias/verixa-anchor";
 
@@ -46,6 +46,17 @@ describe("LocalTransactionSigner", () => {
     }
 
     expect(message).not.toContain(seed);
+  });
+});
+
+describe("publicKeyFromSecret", () => {
+  it("derives the G... address from an S... secret", () => {
+    const keypair = Keypair.random();
+    expect(publicKeyFromSecret(keypair.secret())).toBe(keypair.publicKey());
+  });
+
+  it("throws on a malformed secret instead of returning a wrong account", () => {
+    expect(() => publicKeyFromSecret("not-a-secret")).toThrow();
   });
 });
 
