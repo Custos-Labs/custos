@@ -209,6 +209,13 @@ Clock-drift tolerance is a usability necessity (phones and servers rarely agree 
 _Alternative considered:_ Accept any code that mathematically validates within the current or adjacent time step without persistent state.
 _Reason rejected:_ Accepting a code unconditionally enables immediate replay attacks within the 30-90 second validity window. If a user enters their code on a compromised network or phishing proxy, the attacker could reuse the same code milliseconds later. By persisting the \lastUsedStep\ on the \MfaMethod\ and strictly rejecting any authentication attempt that maps to a step less than or equal to it, we completely neutralize replay attacks within the drift window.
 
+**Persistence:** `failed_attempts`, `locked_until` and `last_used_step` are
+columns on `mfa_methods` (Issue 100), so the lockout and the replay rejection
+hold across requests and restarts — not just within one process's memory. A
+failed TOTP attempt followed by a fresh repository read still reports the
+incremented count, and a code accepted once is rejected on a second submission
+even after the method is rehydrated.
+
 ## Step-Up, Backup Codes, Recovery and Enforcement
 
 ### Step-up Authentication

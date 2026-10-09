@@ -663,6 +663,19 @@ model MfaMethod {
 
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
+  /// Consecutive failed challenge attempts. Reset on success; drives the
+  /// exponential lockout (see MfaMethod.recordFailedAttempt). Persisted so a
+  /// lockout survives across requests and restarts (Issue 100).
+  failedAttempts Int @default(0) @map("failed_attempts")
+
+  /// When the current lockout lifts, null when the method is not locked.
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz(3)
+
+  /// TOTP time-step of the last accepted code. A code whose step is <= this
+  /// value is rejected as a replay (see MfaMethod.recordTotpUse). Persisted
+  /// so replay protection survives rehydration (Issue 100).
+  lastUsedStep Int? @map("last_used_step")
+
   createdAt DateTime @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
 
