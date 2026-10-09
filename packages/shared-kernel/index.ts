@@ -25,7 +25,7 @@ export {
   TENANT_CONTEXT_MECHANISM,
   TENANT_CONTEXT_SETTING,
 } from "./infrastructure/tenant-context.js";
-export { NoopRateLimiter } from "./infrastructure/adapters/noop-rate-limiter.js";
+export { AlwaysAllowRateLimiter } from "./infrastructure/adapters/always-allow-rate-limiter.js";
 export {
   RateLimitExceededError,
   type RateLimitKey,

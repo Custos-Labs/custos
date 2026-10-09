@@ -8,7 +8,7 @@ import {
   RequestPasswordReset,
 } from "@verixa/credentials";
 import { PrismaUserRepository, RegisterUser, UserStatusChanged } from "@verixa/identity";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestPrismaClient, databaseAvailability } from "./helpers/database.js";
@@ -26,13 +26,13 @@ describe.skipIf(!available)("Credential cleanup on user deletion (Issue 075)", (
   const registerUserWithPassword = new RegisterUserWithPassword(
     credentialsUnitOfWork,
     hasher,
-    new NoopRateLimiter(),
+    new AlwaysAllowRateLimiter(),
   );
   const requestEmailVerification = new RequestEmailVerification(credentialsUnitOfWork, notifier);
   const requestPasswordReset = new RequestPasswordReset(
     credentialsUnitOfWork,
     notifier,
-    new NoopRateLimiter(),
+    new AlwaysAllowRateLimiter(),
   );
   const handler = new HandleUserDeleted(credentialsUnitOfWork);
 

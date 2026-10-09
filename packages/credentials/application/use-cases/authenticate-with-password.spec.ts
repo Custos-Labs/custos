@@ -1,6 +1,6 @@
 import { Email, type User } from "@verixa/identity";
 import type { MfaEnforcementLevel } from "@verixa/mfa";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";
@@ -52,8 +52,8 @@ describe("AuthenticateWithPassword", () => {
     // instance. Sharing one would let the first test warm the cache for the
     // rest and quietly disarm the timing test below.
     hasher = new Argon2PasswordHasher(FAST);
-    register = new RegisterUserWithPassword(unitOfWork, hasher, new NoopRateLimiter());
-    authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+    register = new RegisterUserWithPassword(unitOfWork, hasher, new AlwaysAllowRateLimiter());
+    authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new AlwaysAllowRateLimiter());
 
     const registered = await register.execute({
       email: EMAIL,
@@ -105,7 +105,7 @@ describe("AuthenticateWithPassword", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         hasher,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         DEFAULT_LOCKOUT_POLICY,
         mfaChecker,
       );
@@ -124,7 +124,7 @@ describe("AuthenticateWithPassword", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         hasher,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         DEFAULT_LOCKOUT_POLICY,
         mfaChecker,
       );
@@ -145,7 +145,7 @@ describe("AuthenticateWithPassword", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         hasher,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         DEFAULT_LOCKOUT_POLICY,
         mfaChecker,
       );
@@ -262,7 +262,11 @@ describe("AuthenticateWithPassword", () => {
         },
         needsRehash: (encodedHash) => hasher.needsRehash(encodedHash),
       };
-      const useCase = new AuthenticateWithPassword(unitOfWork, counting, new NoopRateLimiter());
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        counting,
+        new AlwaysAllowRateLimiter(),
+      );
 
       await useCase.execute({ email: EMAIL, password: "wrong password entirely" });
       const afterWrongPassword = verifications;
@@ -281,7 +285,11 @@ describe("AuthenticateWithPassword", () => {
       // hasher configured with different ones — which looks like it works,
       // costs the wrong amount, and leaves the side channel open.
       const expensive = new Argon2PasswordHasher({ ...FAST, timeCost: 3 });
-      const useCase = new AuthenticateWithPassword(unitOfWork, expensive, new NoopRateLimiter());
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        expensive,
+        new AlwaysAllowRateLimiter(),
+      );
 
       const result = await useCase.execute({ email: "nobody@example.com", password: PASSWORD });
 
@@ -295,7 +303,11 @@ describe("AuthenticateWithPassword", () => {
       // is the only time the plaintext exists. Without this, raising cost
       // parameters would mean a mass password reset.
       const stronger = new Argon2PasswordHasher({ ...FAST, memoryCost: 512 });
-      const useCase = new AuthenticateWithPassword(unitOfWork, stronger, new NoopRateLimiter());
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        stronger,
+        new AlwaysAllowRateLimiter(),
+      );
 
       const existing = await loadUser(unitOfWork);
       const before = await unitOfWork.repositories.credentials.findByUserId(existing.id);
@@ -342,7 +354,7 @@ describe("AuthenticateWithPassword", () => {
             unitOfWork.repositories.credentials.getStaleCredentialMetrics(hasher),
         },
       });
-      const useCase = new AuthenticateWithPassword(failing, stronger, new NoopRateLimiter());
+      const useCase = new AuthenticateWithPassword(failing, stronger, new AlwaysAllowRateLimiter());
 
       const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
 

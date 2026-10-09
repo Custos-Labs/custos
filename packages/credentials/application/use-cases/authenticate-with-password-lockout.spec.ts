@@ -1,6 +1,6 @@
 import { Email, type User } from "@verixa/identity";
 import {
-  NoopRateLimiter,
+  AlwaysAllowRateLimiter,
   AccountLockedError,
   AuthenticationError,
   Result,
@@ -47,12 +47,17 @@ describe("AuthenticateWithPassword — lockout", () => {
   beforeEach(async () => {
     unitOfWork = new InMemoryCredentialsUnitOfWork();
     hasher = new Argon2PasswordHasher(FAST);
-    authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), POLICY);
+    authenticate = new AuthenticateWithPassword(
+      unitOfWork,
+      hasher,
+      new AlwaysAllowRateLimiter(),
+      POLICY,
+    );
 
     const registered = await new RegisterUserWithPassword(
       unitOfWork,
       hasher,
-      new NoopRateLimiter(),
+      new AlwaysAllowRateLimiter(),
     ).execute({
       email: EMAIL,
       displayName: "Alice",
@@ -170,7 +175,7 @@ describe("AuthenticateWithPassword — lockout", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         counting,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         POLICY,
       );
 
