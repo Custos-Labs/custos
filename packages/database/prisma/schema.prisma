@@ -111,6 +111,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
   mfaMethods              MfaMethod[]
+  webauthnCredentials     WebAuthnCredential[]
   roleAssignments         UserRoleAssignment[]
   verificationRequests    VerificationRequest[]    @relation("VerificationRequestSubject")
   sessions                Session[]
@@ -667,10 +668,54 @@ model MfaMethod {
   updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webAuthnCredential WebAuthnCredential?
 
   @@index([userId])
   @@index([userId, status])
   @@map("mfa_methods")
+}
+
+/// A WebAuthn (FIDO2 / passkey) credential registered by a user (Issue 099).
+///
+/// Phishing-resistant credential material. The server stores only the public
+/// key, sign counter, and transport hints — no private keys exist that an
+/// attacker could exfiltrate from the database. `signCounter` is the
+/// clone-detection signal (Issue 113) — an assertion whose counter does not
+/// exceed the stored one is rejected as a suspected clone.
+model WebAuthnCredential {
+  id String @id @db.Uuid
+
+  /// The authenticator-generated credential id (base64url). Globally unique:
+  /// the same physical credential must never be registered twice.
+  credentialId String @unique @map("credential_id")
+
+  userId String @map("user_id") @db.Uuid
+
+  /// The MFA method this credential backs. Unique: one credential row per method.
+  mfaMethodId String @unique @map("mfa_method_id") @db.Uuid
+
+  /// Public key bytes (COSE / base64url).
+  publicKey String @map("public_key")
+
+  /// Authenticator sign count, initialized at registration. Strictly
+  /// increasing per assertion; used for clone detection.
+  signCounter Int @default(0) @map("sign_counter")
+
+  /// Transport hints the authenticator advertised at registration
+  /// ("usb", "nfc", "ble", "hybrid", "internal", ...).
+  transports String[] @default([]) @map("transports")
+
+  /// Attestation format (e.g. "none", "packed").
+  attestationType String @map("attestation_type")
+
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mfaMethod MfaMethod @relation(fields: [mfaMethodId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("webauthn_credentials")
 }
 
 /// A logged-in session for a user (Issue 096). Maps to the `Session` entity in

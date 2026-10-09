@@ -138,6 +138,7 @@ export { WebAuthnAssertionVerifier } from "./infrastructure/webauthn/assertion-v
 
 // Infrastructure: persistence adapter
 export { PrismaMfaMethodRepository } from "./infrastructure/persistence/prisma-mfa-method-repository.js";
+export { PrismaWebAuthnCredentialRepository } from "./infrastructure/persistence/prisma-webauthn-credential-repository.js";
 
 // Infrastructure: testing fakes
 export { InMemoryMfaMethodRepository } from "./infrastructure/testing/in-memory-mfa-method-repository.js";

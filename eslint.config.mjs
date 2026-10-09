@@ -25,12 +25,6 @@ export default tseslint.config(
       // that are all symptoms of that, which drowns out real findings.
       "packages/sessions/**",
       "packages/verification/**",
-      // Not built: written against a `webauthn_credentials` table that was
-      // never migrated. See the header comment on
-      // prisma-webauthn-credential-repository.ts.
-      "packages/mfa/infrastructure/persistence/prisma-webauthn-credential-repository.ts",
-      "packages/mfa/infrastructure/persistence/prisma-webauthn-credential-repository.spec.ts",
-      "packages/mfa/infrastructure/persistence/webauthn-credential-mapper.ts",
     ],
   },
   js.configs.recommended,

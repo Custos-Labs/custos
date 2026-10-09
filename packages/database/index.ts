@@ -87,4 +87,6 @@ export type {
   User as UserRow,
   MfaMethod as MfaMethodRow,
   VerificationRequest as VerificationRequestRow,
+  WebAuthnCredential,
+  WebAuthnCredential as WebAuthnCredentialRow,
 } from "@prisma/client";

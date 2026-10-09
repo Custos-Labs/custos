@@ -4,10 +4,5 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["index.ts", "domain/**/*", "application/**/*", "infrastructure/**/*"],
-  "exclude": [
-    "infrastructure/persistence/prisma-webauthn-credential-repository.ts",
-    "infrastructure/persistence/prisma-webauthn-credential-repository.spec.ts",
-    "infrastructure/persistence/webauthn-credential-mapper.ts"
-  ]
+  "include": ["index.ts", "domain/**/*", "application/**/*", "infrastructure/**/*"]
 }
