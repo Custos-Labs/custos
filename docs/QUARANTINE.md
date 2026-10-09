@@ -65,6 +65,13 @@ Several open pull requests rebuild parts of these packages properly. Merging
 those — with CI green — is likely to be a faster route than reconciling the
 current state by hand.
 
+**Benchmarks and quarantine.** Quarantined packages carry no `benchmark`
+script: `packages/sessions`' previously pointed at `scripts/benchmark-repositories.ts`,
+which never existed in the repository tree, so it was removed rather than
+left failing. The benchmark story resumes when quarantine is lifted — for
+sessions that means repository-operation latencies (p50/p95/p99) measured
+against the reconciled code, not the quarantined implementations.
+
 ## Lifted: `packages/mfa`
 
 `packages/mfa` was released from quarantine on 2026-10-04. Reconciling it was
