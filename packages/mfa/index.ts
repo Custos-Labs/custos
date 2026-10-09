@@ -17,6 +17,14 @@ export {
   type UserId,
 } from "./domain/entities/mfa-method.js";
 
+// Domain: errors
+export {
+  InvalidTotpCodeError,
+  MfaMethodMissingSecretError,
+  MfaMethodNotActiveError,
+  MfaMethodNotFoundError,
+} from "./domain/errors.js";
+
 // Domain: value objects
 export { TotpSecret } from "./domain/value-objects/totp-secret.js";
 export { StepUpAssertion } from "./domain/value-objects/step-up-assertion.js";
