@@ -21,6 +21,7 @@
     "test": "pnpm -r run test",
     "test:coverage": "pnpm -r run test:coverage",
     "lint": "eslint .",
+    "check:env": "node scripts/check-env-example.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:backup": "bash scripts/db-backup.sh",
