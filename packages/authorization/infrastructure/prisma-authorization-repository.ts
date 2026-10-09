@@ -9,6 +9,7 @@ import {
   type RoleAssignment,
   type RoleRecord,
 } from "../domain/authorization.js";
+import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
 
 type RoleWithPermissions = {
   id: string;
@@ -78,10 +79,12 @@ export class PrismaAuthorizationRepository implements AuthorizationRepository {
   async deleteRole(id: string): Promise<void> {
     const role = await this.prisma.role.findUnique({
       where: { id },
-      select: { isSystemRole: true },
+      select: { isSystemRole: true, name: true },
     });
     if (role === null) throw new AuthorizationError("NOT_FOUND");
-    if (role.isSystemRole) throw new AuthorizationError("FORBIDDEN");
+    if (role.isSystemRole) {
+      throw new SystemRoleImmutableError(id, role.name ?? id, "delete");
+    }
     await this.prisma.role.delete({ where: { id } });
   }
 

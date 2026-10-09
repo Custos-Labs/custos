@@ -8,6 +8,7 @@ import type {
 
 import type { AuthorizationRepository } from "../application/authorization-repository.js";
 import { AuthorizationError } from "../domain/authorization.js";
+import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
 
 interface RoleParams {
   roleId: string;
@@ -44,6 +45,7 @@ function header(
 }
 
 function errorStatus(error: unknown): number {
+  if (error instanceof SystemRoleImmutableError) return 403;
   if (!(error instanceof AuthorizationError)) return 500;
   return error.code === "NOT_FOUND"
     ? 404
@@ -58,6 +60,13 @@ function replyError(
   reply: { code: (status: number) => { send: (body: object) => unknown } },
   error: unknown,
 ): unknown {
+  if (error instanceof SystemRoleImmutableError) {
+    return reply.code(403).send({
+      code: error.code,
+      error: error.message,
+      attemptedAction: error.attemptedAction,
+    });
+  }
   const status = errorStatus(error);
   return reply.code(status).send({
     error:
