@@ -668,6 +668,17 @@ model MfaMethod {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// Partial unique index (migration 20261009190000): at most one ACTIVE
+  /// method per (userId, type) for the singleton types (totp, backup_codes).
+  /// The challenge path — "which method verifies this code" — assumes one
+  /// active TOTP secret per user, and this index makes that a database
+  /// guarantee rather than an application convention. Pending rows are
+  /// excluded so the enroll-then-confirm lifecycle still works (a
+  /// re-enrollment is pending next to the still-active old method until it is
+  /// confirmed); disabled rows are excluded so re-enrollment after a disable
+  /// keeps working. WebAuthn is excluded: users may enroll multiple passkeys.
+  /// (Prisma cannot express partial indexes, so the index itself lives in the
+  /// migration's SQL.)
   @@index([userId])
   @@index([userId, status])
   @@map("mfa_methods")

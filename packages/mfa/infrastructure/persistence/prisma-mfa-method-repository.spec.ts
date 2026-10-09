@@ -95,4 +95,17 @@ describe.skipIf(database === undefined)("PrismaMfaMethodRepository (real Postgre
       expect(fetched?.secret).toBe(plaintext);
     });
   });
+
+  describe("singleton active constraint (Issue 101)", () => {
+    it("rejects two active TOTP methods for the same user via unique constraint", async () => {
+      const repository = new PrismaMfaMethodRepository(prisma);
+      const userId = await setupUser();
+
+      const method1 = MfaMethod.createPendingTotp(userId, { value: "SECRET1" }).activate();
+      await repository.save(method1);
+
+      const method2 = MfaMethod.createPendingTotp(userId, { value: "SECRET2" }).activate();
+      await expect(repository.save(method2)).rejects.toThrow();
+    });
+  });
 });

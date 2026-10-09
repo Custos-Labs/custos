@@ -17,10 +17,24 @@ describe("ConfirmTotpEnrollment", () => {
         return Promise.resolve();
       },
       findById: (id) => Promise.resolve(savedMethods.get(id)),
-      findActiveByUserId: () => Promise.resolve([]),
-      findPendingByUserId: () => Promise.resolve([]),
-      findAllByUserId: () => Promise.resolve([]),
-      delete: () => Promise.resolve(),
+      findActiveByUserId: (userId) =>
+        Promise.resolve(
+          Array.from(savedMethods.values()).filter(
+            (m) => m.userId === userId && m.status === "active",
+          ),
+        ),
+      findPendingByUserId: (userId) =>
+        Promise.resolve(
+          Array.from(savedMethods.values()).filter(
+            (m) => m.userId === userId && m.status === "pending",
+          ),
+        ),
+      findAllByUserId: (userId) =>
+        Promise.resolve(Array.from(savedMethods.values()).filter((m) => m.userId === userId)),
+      delete: (id) => {
+        savedMethods.delete(id);
+        return Promise.resolve();
+      },
     };
 
     const fakeAlgo: TotpAlgorithm = {
@@ -102,5 +116,26 @@ describe("ConfirmTotpEnrollment", () => {
     if (Result.isErr(result)) {
       expect(result.error).toBeInstanceOf(AccountLockedError);
     }
+  });
+
+  it("disables the previous active method when confirming a re-enrollment", async () => {
+    const { useCase, fakeRepo } = setup();
+    const userId = createId<"UserId">();
+
+    const oldMethod = MfaMethod.createPendingTotp(userId, { value: "OLDSECRET" }).activate();
+    await fakeRepo.save(oldMethod);
+
+    const pending = MfaMethod.createPendingTotp(userId, { value: "NEWSECRET" });
+    await fakeRepo.save(pending);
+
+    const result = await useCase.execute({ methodId: pending.id, code: "123456" });
+    expect(Result.isOk(result)).toBe(true);
+
+    const methods = await fakeRepo.findActiveByUserId(userId);
+    expect(methods.filter((m) => m.type === "totp")).toHaveLength(1);
+    expect(methods[0]!.id).toBe(pending.id);
+
+    const oldReloaded = await fakeRepo.findById(oldMethod.id);
+    expect(oldReloaded!.status).toBe("disabled");
   });
 });
