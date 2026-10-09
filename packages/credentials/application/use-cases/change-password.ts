@@ -1,5 +1,12 @@
 import type { User } from "@verixa/identity";
-import { Result, ValidationError, type Id, type RateLimiter } from "@verixa/shared-kernel";
+import {
+  RateLimitExceededError,
+  Result,
+  ValidationError,
+  type Id,
+  type RateLimitKey,
+  type RateLimiter,
+} from "@verixa/shared-kernel";
 
 import { type PasswordHistoryPolicy } from "../../domain/value-objects/password-history-policy.js";
 import { DEFAULT_PASSWORD_HISTORY_POLICY } from "../../domain/value-objects/password-history-policy.js";
@@ -46,6 +53,17 @@ export class ChangePassword {
   async execute(
     command: ChangePasswordCommand,
   ): Promise<Result<ChangePasswordResult, ValidationError>> {
+    // 1. Check rate limit BEFORE any other logic
+    const rateLimitKey: RateLimitKey = {
+      action: "password-change",
+      identifier: command.userId,
+    };
+
+    const limitResult = await this.rateLimiter.check(rateLimitKey);
+    if (!limitResult.allowed) {
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
+    }
+
     // Validate the new password policy first, before any hashing or
     // database work. A rejected password should not advance the change.
     const passwordResult = RawPassword.create(command.newPassword, this.passwordPolicy);
@@ -96,7 +114,8 @@ export class ChangePassword {
     if (outcome.kind === "wrong_current_password") {
       // Wrong re-authentication is treated as authentication failure: same
       // message, same timing (password verification is expensive and took
-      // time already).
+      // time already). Record failure so repeated guessing is rate limited.
+      await this.rateLimiter.recordFailure(rateLimitKey);
       return Result.err(
         new ValidationError("Current password is incorrect.", { currentPassword: ["incorrect"] }),
       );
@@ -127,6 +146,9 @@ export class ChangePassword {
       const rotated = credential.rotatePassword(newHash, this.passwordHistoryPolicy);
       await repositories.credentials.save(rotated);
     });
+
+    // Reset rate limit counter on successful password change
+    await this.rateLimiter.reset(rateLimitKey);
 
     return Result.ok({ user: outcome.user });
   }
