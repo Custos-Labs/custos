@@ -143,4 +143,3 @@ export { PrismaMfaMethodRepository } from "./infrastructure/persistence/prisma-m
 export { InMemoryMfaMethodRepository } from "./infrastructure/testing/in-memory-mfa-method-repository.js";
 export { InMemoryWebAuthnCredentialRepository } from "./infrastructure/fakes/in-memory-webauthn-credential-repository.js";
 export { InMemoryWebAuthnChallengeRepository } from "./infrastructure/fakes/in-memory-webauthn-challenge-repository.js";
-export { InMemoryDomainEventPublisher } from "./infrastructure/fakes/in-memory-domain-event-publisher.js";

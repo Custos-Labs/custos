@@ -1,13 +1,12 @@
 import crypto from "node:crypto";
 
-import { Result, asId } from "@verixa/shared-kernel";
+import { InMemoryEventPublisher, Result, asId, type DomainEvent } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
 import { WebAuthnChallenge } from "../../domain/entities/webauthn-challenge.js";
 import { WebAuthnCredential } from "../../domain/entities/webauthn-credential.js";
 import { WebAuthnCloneSuspected } from "../../domain/events/webauthn-clone-suspected.js";
-import { InMemoryDomainEventPublisher } from "../../infrastructure/fakes/in-memory-domain-event-publisher.js";
 import { InMemoryWebAuthnChallengeRepository } from "../../infrastructure/fakes/in-memory-webauthn-challenge-repository.js";
 import { InMemoryWebAuthnCredentialRepository } from "../../infrastructure/fakes/in-memory-webauthn-credential-repository.js";
 import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-memory-mfa-method-repository.js";
@@ -82,7 +81,8 @@ describe("VerifyWebAuthnAssertion use case", () => {
   let credentialRepo: InMemoryWebAuthnCredentialRepository;
   let challengeRepo: InMemoryWebAuthnChallengeRepository;
   let assertionVerifier: WebAuthnAssertionVerifier;
-  let eventPublisher: InMemoryDomainEventPublisher;
+  let eventPublisher: InMemoryEventPublisher;
+  let publishedEvents: DomainEvent[];
   let useCase: VerifyWebAuthnAssertion;
 
   const userId = "user_test_456";
@@ -93,7 +93,11 @@ describe("VerifyWebAuthnAssertion use case", () => {
     credentialRepo = new InMemoryWebAuthnCredentialRepository();
     challengeRepo = new InMemoryWebAuthnChallengeRepository();
     assertionVerifier = new WebAuthnAssertionVerifier();
-    eventPublisher = new InMemoryDomainEventPublisher();
+    eventPublisher = new InMemoryEventPublisher();
+    publishedEvents = [];
+    eventPublisher.subscribe("mfa.webauthn.clone_suspected", (event) => {
+      publishedEvents.push(event);
+    });
 
     useCase = new VerifyWebAuthnAssertion(
       mfaMethodRepo,
@@ -221,8 +225,8 @@ describe("VerifyWebAuthnAssertion use case", () => {
       }
 
       // Check domain event was published
-      expect(eventPublisher.publishedEvents.length).toBe(1);
-      const event = eventPublisher.publishedEvents[0];
+      expect(publishedEvents.length).toBe(1);
+      const event = publishedEvents[0];
       expect(event).toBeInstanceOf(WebAuthnCloneSuspected);
       if (event instanceof WebAuthnCloneSuspected) {
         expect(event.credentialId).toBe("cred_clone_test");
