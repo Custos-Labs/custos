@@ -192,9 +192,12 @@ export type {
 } from "./application/ports/rbac-authorization.js";
 export { AuthorizeAction } from "./application/use-cases/authorize-action.js";
 export type { AuthorizeActionCommand } from "./application/use-cases/authorize-action.js";
-export { AuthorizationError } from "./domain/authorization.js";
-export type { PermissionKey, RoleAssignment, RoleRecord } from "./domain/authorization.js";
-export type { AuthorizationRepository } from "./application/authorization-repository.js";
+export { AuthorizationError } from "./domain/errors/authorization-error.js";
+export type {
+  RoleAssignment,
+  AuthorizationRepository,
+} from "./application/authorization-repository.js";
+export type { RoleRecord } from "./domain/entities/role.js";
 export { PrismaAuthorizationRepository } from "./infrastructure/prisma-authorization-repository.js";
 export {
   DEFAULT_PERMISSIONS,

@@ -1,4 +1,18 @@
-import type { RoleAssignment, RoleRecord } from "../domain/authorization.js";
+import type { RoleRecord } from "../domain/entities/role.js";
+
+/**
+ * Read-model for a role-assignment row returned by this port.
+ * (Verbatim shape of the retired legacy interface.)
+ */
+export interface RoleAssignment {
+  id: string;
+  userId: string;
+  roleId: string;
+  organizationId: string;
+  assignedAt: Date;
+  assignedBy: string | null;
+  expiresAt: Date | null;
+}
 
 export interface AuthorizationRepository {
   listRoles(): Promise<RoleRecord[]>;
