@@ -189,11 +189,16 @@ linter checks and why.
 
 ## Contributing
 
-Custos isn't yet open for external contribution — the initial architecture and
-foundational tooling are still being laid down. See
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the local developer workflow so far.
-A `CODE_OF_CONDUCT.md` and issue/PR templates will land as part of the
-roadmap before the project accepts outside contributions.
+Custos accepts external contributions through its **bounty programme**: open
+issues titled `[Bounty: $X]` carry a reward for a solution that meets their
+acceptance criteria. Pick an issue, read the criteria, and post your solution
+as a comment on the issue or submit a pull request.
+
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md): the local workflow,
+conventions, and quality gates (lint, typecheck, tests) a solution must
+satisfy. Drive-by pull requests outside the bounty issues are not reviewed at
+this stage — the architecture and foundational tooling are still being laid
+down.
 
 ## License
 

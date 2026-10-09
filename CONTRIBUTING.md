@@ -1,10 +1,13 @@
 # Contributing to Verixa
 
-Verixa isn't yet open for external contributions — the initial architecture
-and foundational tooling are still being laid down (see the roadmap
-referenced from the main README). This document covers the local developer
-workflow for the maintainers doing that early work, and will grow into full
-contribution guidelines before the project opens up.
+Verixa accepts external contributions through its **bounty programme**: open
+issues titled `[Bounty: $X]` carry a reward for a solution that meets their
+acceptance criteria — post the solution as a comment on the issue or submit a
+pull request. This document covers the local developer workflow, conventions
+(domain modeling, package boundaries, error handling), and quality gates (lint,
+typecheck, tests) that a solution is reviewed against. Drive-by pull requests
+outside the bounty issues are not reviewed at this stage — the architecture and
+foundational tooling are still being laid down.
 
 ## Getting started
 
