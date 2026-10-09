@@ -65,49 +65,20 @@ Several open pull requests rebuild parts of these packages properly. Merging
 those — with CI green — is likely to be a faster route than reconciling the
 current state by hand.
 
-## Lifted: `packages/mfa`
-
-`packages/mfa` was released from quarantine on 2026-10-04. Reconciling it was
-the work the section above describes: one `MfaMethod` was kept — the
-props-object aggregate, because it was the only one carrying the lockout and
-replay state the TOTP use cases call for — and the others were deleted, with
-the specs made to agree. What remained afterwards was ordinary cleanup:
-
-- `vitest.config.ts` declared `name` **twice**, as `@verixa/identity` and then
-  `@verixa/credentials`, so this package's 81 tests were reported under another
-  package's name. The duplicated key is the same "keep both sides" damage.
-- `as any` on both halves of the Prisma `upsert`. The mapper's row type already
-  matched the schema exactly, so the casts were suppressing nothing — except
-  any future drift between the two.
-- `JSON.parse` assigned straight to `string[]` when reading stored backup-code
-  hashes, so valid JSON of the wrong shape became a wrongly-typed array and
-  failed later, inside the verification loop, looking like a hashing fault.
-- Test doubles declared `async` with nothing to await, which is why the rule was
-  turned off wholesale rather than satisfied.
-
-One **security fix** came out of it. `infrastructure/crypto/encryption.ts` fell
-back to `Buffer.alloc(32, 1)` whenever `MFA_ENCRYPTION_KEY` was unset — and the
-variable was set nowhere in the repository: not in `.env.example`, not in the
-config package, not in CI. Every TOTP secret would have been encrypted at rest
-under a constant key visible in the source, with nothing logged or thrown to
-reveal it. `encrypt` now refuses to run without a key and validates its length,
-and `encryption.spec.ts` holds the regression test.
-
-The package now builds, typechecks, lints with zero errors, and passes 90 tests
-at 95% statement coverage.
-
 ## Lifted: `packages/mfa` (2026-10-04)
 
-Released from quarantine. Kept as the worked example for the other two, because
-the interesting part was not the syntax repair.
+`packages/mfa` was released from quarantine on 2026-10-04. Reconciling it was
+the work the section above describes, kept as the worked example for the other
+two packages because the interesting part was not the syntax repair:
 
 **One design was chosen.** `MfaMethod` survives as the props-object aggregate,
-because it was the only version carrying the lockout and replay state the TOTP
-use cases need. The others were deleted.
+because it was the only one carrying the lockout and replay state the TOTP use
+cases need. The other conflicting implementations were deleted, and the specs
+made to agree.
 
 **The one real collision was `recordUse`.** TOTP called
 `recordUse(matchedStep, now)`, protecting against replay by refusing a step not
-strictly greater than the last consumed one -- clock-drift tolerance means a
+strictly greater than the last consumed one — clock-drift tolerance means a
 single code is valid across several seconds. WebAuthn called `recordUse(now)`,
 because its replay protection is the authenticator's monotonic `signCount`,
 which lives on `WebAuthnCredential` and is where clone detection reads it.
@@ -125,22 +96,36 @@ confirmed by a first valid code, because the server cannot otherwise know the
 user stored the secret. WebAuthn has no equivalent: the registration ceremony
 verifies an attestation before anything persists.
 
-**A security bug was found underneath.** `infrastructure/crypto/encryption.ts`
-fell back to `Buffer.alloc(32, 1)` when `MFA_ENCRYPTION_KEY` was unset -- and
-the variable was set nowhere in the repository. Every TOTP secret would have
-been encrypted at rest under a constant visible in this source tree, with
-nothing thrown or logged. `encrypt` now refuses to run without a key and
-validates its length.
+**Ordinary cleanup followed the reconciliation:**
+
+- `vitest.config.ts` declared `name` **twice**, as `@verixa/identity` and then
+  `@verixa/credentials`, so this package's tests were reported under another
+  package's name. The duplicated key was the same "keep both sides" damage.
+- `as any` on both halves of the Prisma `upsert`. The mapper's row type already
+  matched the schema exactly, so the casts were suppressing nothing — except
+  any future drift between the two.
+- `JSON.parse` assigned straight to `string[]` when reading stored backup-code
+  hashes, so valid JSON of the wrong shape became a wrongly-typed array and
+  failed later, inside the verification loop, looking like a hashing fault.
+- Test doubles declared `async` with nothing to await, which is why the rule was
+  turned off wholesale rather than satisfied.
+- `index.ts` held two versions, one wildcard and one curated. The curated form
+  was kept: `export *` makes the public surface whatever the files happen to
+  contain, which is how internals become someone else's dependency by accident.
+
+**A security fix was found underneath.** `infrastructure/crypto/encryption.ts`
+fell back to `Buffer.alloc(32, 1)` whenever `MFA_ENCRYPTION_KEY` was unset — and
+the variable was set nowhere in the repository: not in `.env.example`, not in the
+config package, not in CI. Every TOTP secret would have been encrypted at rest
+under a constant key visible in the source tree, with nothing logged or thrown
+to reveal it. `encrypt` now refuses to run without a key and validates its
+length, and `encryption.spec.ts` holds the regression test.
 
 **`docs/security/mfa-design.md` held three concatenated documents.** They
-covered different ground -- WebAuthn, TOTP, and step-up/backup-codes/policy --
+covered different ground — WebAuthn, TOTP, and step-up/backup-codes/policy —
 rather than contradicting each other, so all three became sections of one
 document. Not every concatenation is a conflict of substance; check before
 choosing.
-
-**`index.ts` held two versions**, one wildcard and one curated. The curated form
-was kept: `export *` makes the public surface whatever the files happen to
-contain, which is how internals become someone else's dependency by accident.
 
 The package now builds, typechecks, lints with zero errors, and passes its
 suite at 93% statement coverage against a 90/90/85/85 gate.
