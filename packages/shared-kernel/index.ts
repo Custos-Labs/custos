@@ -27,6 +27,11 @@ export {
 } from "./infrastructure/tenant-context.js";
 export { NoopRateLimiter } from "./infrastructure/adapters/noop-rate-limiter.js";
 export {
+  toHttpError,
+  type ErrorResponseBody,
+  type HttpErrorMapping,
+} from "./infrastructure/http-error.js";
+export {
   RateLimitExceededError,
   type RateLimitKey,
   type RateLimitResult,

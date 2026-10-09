@@ -1,3 +1,10 @@
+import {
+  AuthorizationError,
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+  toHttpError,
+} from "@verixa/shared-kernel";
 import type {
   FastifyBaseLogger,
   FastifyInstance,
@@ -7,7 +14,7 @@ import type {
 } from "fastify";
 
 import type { AuthorizationRepository } from "../application/authorization-repository.js";
-import { AuthorizationError } from "../domain/authorization.js";
+import { AuthorizationError as LegacyAuthorizationError } from "../domain/authorization.js";
 
 interface RoleParams {
   roleId: string;
@@ -43,30 +50,33 @@ function header(
   return Array.isArray(value) ? value[0] : value;
 }
 
-function errorStatus(error: unknown): number {
-  if (!(error instanceof AuthorizationError)) return 500;
-  return error.code === "NOT_FOUND"
-    ? 404
-    : error.code === "CONFLICT"
-      ? 409
-      : error.code === "INVALID"
-        ? 400
-        : 403;
+/**
+ * Translates legacy authorization error codes to shared-kernel domain
+ * errors so the admin surface speaks the single error shape.
+ */
+function toSharedError(error: unknown): unknown {
+  if (error instanceof LegacyAuthorizationError) {
+    switch (error.code) {
+      case "NOT_FOUND":
+        return new NotFoundError("The requested authorization record was not found.");
+      case "CONFLICT":
+        return new ConflictError("The request conflicts with the current authorization state.");
+      case "INVALID":
+        return new ValidationError("The request was invalid.");
+      case "FORBIDDEN":
+        return new AuthorizationError("Forbidden.");
+    }
+  }
+  return error;
 }
 
-function replyError(
+/** Thin adapter: the shared mapping, sent through this route's reply shape. */
+function sendRouteError(
   reply: { code: (status: number) => { send: (body: object) => unknown } },
   error: unknown,
 ): unknown {
-  const status = errorStatus(error);
-  return reply.code(status).send({
-    error:
-      status === 403
-        ? "Forbidden"
-        : error instanceof Error
-          ? error.message
-          : "Internal server error",
-  });
+  const { status, body } = toHttpError(toSharedError(error));
+  return reply.code(status).send(body);
 }
 
 /** Registers the complete RBAC management surface. Authentication is supplied
@@ -94,7 +104,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
         permission,
       ))
     ) {
-      reply.code(403).send({ error: "Forbidden" });
+      sendRouteError(reply, new AuthorizationError("Forbidden."));
       return false;
     }
     return true;
@@ -107,7 +117,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
   app.post<{ Body: CreateRoleBody }>("/admin/roles", async (request, reply) => {
     if (!(await requirePermission(request, reply, "roles:write"))) return;
     if (request.body.name.trim() === "" || request.body.description.trim() === "") {
-      return reply.code(400).send({ error: "name and description are required" });
+      return sendRouteError(reply, new ValidationError("name and description are required"));
     }
     try {
       const role = await authorization.createRole({
@@ -116,7 +126,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
       });
       return reply.code(201).send(role);
     } catch (error) {
-      return replyError(reply, error);
+      return sendRouteError(reply, error);
     }
   });
   app.patch<{ Params: RoleParams; Body: UpdateRoleBody }>(
@@ -126,7 +136,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
       try {
         return await authorization.updateRole(request.params.roleId, request.body);
       } catch (error) {
-        return replyError(reply, error);
+        return sendRouteError(reply, error);
       }
     },
   );
@@ -136,7 +146,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
       await authorization.deleteRole(request.params.roleId);
       return reply.code(204).send();
     } catch (error) {
-      return replyError(reply, error);
+      return sendRouteError(reply, error);
     }
   });
   app.get("/admin/permissions", async (request, reply) => {
@@ -150,7 +160,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
       try {
         return await authorization.grantPermission(request.params.roleId, request.body.key);
       } catch (error) {
-        return replyError(reply, error);
+        return sendRouteError(reply, error);
       }
     },
   );
@@ -161,7 +171,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
       try {
         return await authorization.revokePermission(request.params.roleId, request.body.key);
       } catch (error) {
-        return replyError(reply, error);
+        return sendRouteError(reply, error);
       }
     },
   );
@@ -175,7 +185,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
         (request.query.organizationId !== undefined &&
           request.query.organizationId !== callerOrganizationId)
       ) {
-        return reply.code(403).send({ error: "Forbidden" });
+        return sendRouteError(reply, new AuthorizationError("Forbidden."));
       }
       return authorization.listAssignments(request.params.userId, callerOrganizationId);
     },
@@ -189,10 +199,12 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
         const callerOrganizationId = header(request, "x-organization-id");
         const organizationId = request.body.organizationId ?? callerOrganizationId;
         if (organizationId === undefined || organizationId !== callerOrganizationId) {
-          return reply.code(403).send({ error: "Forbidden" });
+          return sendRouteError(reply, new AuthorizationError("Forbidden."));
         }
         const targetRole = await authorization.getRole(request.body.roleId);
-        if (targetRole === undefined) return reply.code(404).send({ error: "Role not found" });
+        if (targetRole === undefined) {
+          return sendRouteError(reply, new NotFoundError("Role not found"));
+        }
         if (actorId === request.params.userId) {
           const canGrant = await Promise.all(
             targetRole.permissions.map((permission) =>
@@ -203,7 +215,9 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
               ),
             ),
           );
-          if (!canGrant.every(Boolean)) return reply.code(403).send({ error: "Forbidden" });
+          if (!canGrant.every(Boolean)) {
+            return sendRouteError(reply, new AuthorizationError("Forbidden."));
+          }
         }
         const assignment = await authorization.assignRole({
           userId: request.params.userId,
@@ -214,7 +228,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
         });
         return reply.code(201).send(assignment);
       } catch (error) {
-        return replyError(reply, error);
+        return sendRouteError(reply, error);
       }
     },
   );
@@ -226,7 +240,7 @@ export function registerAdminAuthorizationRoutes<TLogger extends FastifyBaseLogg
         await authorization.revokeAssignment(request.params.assignmentId);
         return reply.code(204).send();
       } catch (error) {
-        return replyError(reply, error);
+        return sendRouteError(reply, error);
       }
     },
   );
