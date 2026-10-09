@@ -318,6 +318,10 @@ export class AuthenticateWithPassword {
 
     if (this.mfaChecker !== undefined) {
       const policy = await this.mfaChecker.resolvePolicy(verified.user.id);
+      if (policy === "disabled") {
+        return Result.ok({ user: verified.user, rehashed });
+      }
+
       const activeMethods = await this.mfaChecker.listActiveMethods(verified.user.id);
 
       if (policy === "required" && activeMethods.length === 0) {
@@ -329,27 +333,14 @@ export class AuthenticateWithPassword {
         });
       }
 
-      if (
-        policy === "required" ||
-        (policy === "optional" && activeMethods.length > 0) ||
-        activeMethods.length > 0
-      ) {
-        if (activeMethods.length > 0) {
-          return Result.ok({
-            user: verified.user,
-            rehashed,
-            status: "mfa_challenge",
-            userId: verified.user.id,
-            methods: activeMethods,
-          });
-        } else if (policy === "required") {
-          return Result.ok({
-            user: verified.user,
-            rehashed,
-            status: "enrollment_required",
-            userId: verified.user.id,
-          });
-        }
+      if (activeMethods.length > 0) {
+        return Result.ok({
+          user: verified.user,
+          rehashed,
+          status: "mfa_challenge",
+          userId: verified.user.id,
+          methods: activeMethods,
+        });
       }
     }
 

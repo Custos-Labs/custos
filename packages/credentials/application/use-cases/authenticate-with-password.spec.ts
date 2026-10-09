@@ -137,6 +137,26 @@ describe("AuthenticateWithPassword", () => {
       expect(result.value.methods).toHaveLength(1);
     });
 
+    it("does not challenge a disabled subject even when methods are enrolled (Issue 108)", async () => {
+      const mfaChecker = {
+        resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("disabled"),
+        listActiveMethods: () => Promise.resolve([{ id: "m1", type: "totp" as const }]),
+      };
+      const useCase = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new NoopRateLimiter(),
+        DEFAULT_LOCKOUT_POLICY,
+        mfaChecker,
+      );
+      const result = await useCase.execute({ email: EMAIL, password: PASSWORD });
+      expect(Result.isOk(result)).toBe(true);
+      if (!Result.isOk(result)) return;
+      if (!expectPlainLogin(result.value)) return;
+      const user = await loadUser(unitOfWork);
+      expect(result.value.user.id).toBe(user.id);
+    });
+
     it("routes required-but-unenrolled users to enrollment and never grants a session", async () => {
       const mfaChecker = {
         resolvePolicy: () => Promise.resolve<MfaEnforcementLevel>("required"),

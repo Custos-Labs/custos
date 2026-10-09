@@ -21,7 +21,7 @@ export interface StepUpAuthenticationCommand {
 
 export interface StepUpAuthenticationResult {
   readonly userId: string;
-  readonly methodType: MfaMethodType;
+  readonly methodType?: MfaMethodType | undefined;
   readonly verifiedAt: Date;
   readonly expiresAt: Date;
 }
@@ -34,6 +34,7 @@ export interface StepUpAuthenticationDeps {
   readonly auditLogger?: AuditLogger;
   /** Lifetime of the issued assertion; defaults to five minutes. */
   readonly maxAgeSeconds?: number;
+  readonly resolvePolicy?: (userId: string) => Promise<string>;
 }
 
 const DEFAULT_MAX_AGE_SECONDS = 5 * 60;
@@ -63,6 +64,20 @@ export class StepUpAuthentication {
     command: StepUpAuthenticationCommand,
   ): Promise<Result<StepUpAuthenticationResult, Error>> {
     const userId = command.userId;
+
+    const policy = await this.deps.resolvePolicy?.(command.userId);
+    if (policy === "disabled") {
+      const now = new Date();
+      await this.deps.auditLogger?.record("mfa.step_up_skipped", command.userId, {
+        reason: "mfa-disabled",
+      });
+      return Result.ok({
+        userId: command.userId,
+        methodType: undefined,
+        verifiedAt: now,
+        expiresAt: new Date(now.getTime() + this.maxAgeSeconds * 1_000),
+      });
+    }
 
     const verified =
       command.method.type === "totp"

@@ -33,6 +33,8 @@ export interface MfaEnforcementPolicyInput {
 export interface MfaEnforcementDecision {
   /** The resolved level after precedence is applied. */
   readonly level: MfaEnforcementLevel;
+  /** The reason for the decision, indicating posture (Issue 108). */
+  readonly reason: "mfa-disabled" | "mfa-optional" | "mfa-required";
   /** The method types a user is permitted to enroll or use. */
   readonly allowedMethods: readonly MfaMethodType[];
   /** The user's enrolled methods that are permitted by the resolved policy. */
@@ -77,6 +79,12 @@ const ALL_METHODS: readonly MfaMethodType[] = ["totp", "webauthn", "backup_codes
  * `requiresEnrollment` (and `blocked`). The login flow uses this to force
  * enrollment before issuing a session rather than failing the login — see
  * Issue 116 and docs/security/mfa-design.md.
+ *
+ * ## Disabled level
+ *
+ * When the resolved level is `disabled`, the subject is explicitly exempted from
+ * MFA. They are never challenged on login or step-up, even if active methods are
+ * enrolled on the account (Issue 108).
  */
 export class MfaEnforcementPolicy {
   public static resolve(input: MfaEnforcementPolicyInput): MfaEnforcementDecision {
@@ -99,8 +107,16 @@ export class MfaEnforcementPolicy {
 
     const requiresEnrollment = level === "required" && enrolledAllowedMethods.length === 0;
 
+    const reason =
+      level === "disabled"
+        ? "mfa-disabled"
+        : level === "required"
+          ? "mfa-required"
+          : "mfa-optional";
+
     return {
       level,
+      reason,
       allowedMethods: [...allowedMethods],
       enrolledAllowedMethods,
       requiresEnrollment,
