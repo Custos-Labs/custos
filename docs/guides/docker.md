@@ -64,6 +64,21 @@ criteria as the issue that introduced the Dockerfile: **builds, serves
 
 ## Local development stack
 
+Before starting the stack on a fresh clone, prepare a `.env` file from the
+example template and populate the two secrets required by the API:
+
+```bash
+cp .env.example .env
+# Generate local secrets:
+# - SESSION_ACCESS_TOKEN_SECRET: openssl rand -base64 48
+# - MFA_ENCRYPTION_KEY: openssl rand -base64 32
+```
+
+For convenience in purely ephemeral local development, `docker-compose.yml` also
+provides fallback dev defaults for these keys if `.env` is omitted.
+
+Start the stack:
+
 ```bash
 docker compose up
 ```

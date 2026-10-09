@@ -74,6 +74,8 @@ services:
       # the owner. See infra/postgres/02-init-app-role.sh.
       DATABASE_URL: postgres://verixa_app:verixa_app@postgres:5432/verixa
       REDIS_URL: redis://redis:6379
+      SESSION_ACCESS_TOKEN_SECRET: ${SESSION_ACCESS_TOKEN_SECRET:-dev-insecure-session-secret-min-32-chars-long}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
     volumes:
       - .:/repo
       # Named volumes for every node_modules directory in the workspace:
