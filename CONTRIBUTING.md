@@ -6,6 +6,10 @@ referenced from the main README). This document covers the local developer
 workflow for the maintainers doing that early work, and will grow into full
 contribution guidelines before the project opens up.
 
+## Security
+
+Found a security issue? Do not open an issue or PR for it — report it privately per [`SECURITY.md`](SECURITY.md).
+
 ## Getting started
 
 See the [README quickstart](README.md#quickstart) for prerequisites and the
