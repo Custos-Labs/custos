@@ -255,6 +255,12 @@ export interface Container {
    * Call on shutdown.
    */
   readonly mfa: MfaUseCases;
+  /** The resolved WebAuthn relying-party identity (see `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`). */
+  readonly webauthn: {
+    readonly rpId: string;
+    readonly origin: string;
+    readonly usingDefaults: boolean;
+  };
   /** Releases the database connection. Call on shutdown. */
   readonly dispose: () => Promise<void>;
 }
@@ -387,6 +393,8 @@ export function buildContainer(
   // Multi-factor authentication (MFA) use cases and WebAuthn verifier adapters.
   const webauthnRpId = process.env["WEBAUTHN_RP_ID"] ?? "localhost";
   const webauthnOrigin = process.env["WEBAUTHN_ORIGIN"] ?? "http://localhost:3000";
+  const webauthnUsingDefaults =
+    process.env["WEBAUTHN_RP_ID"] === undefined || process.env["WEBAUTHN_ORIGIN"] === undefined;
 
   const mfaMethodRepo = new InMemoryMfaMethodRepository();
   const webAuthnCredentialRepo = new InMemoryWebAuthnCredentialRepository();
@@ -480,6 +488,11 @@ export function buildContainer(
     mfa: {
       registerWebAuthnCredential,
       verifyWebAuthnAssertion,
+    },
+    webauthn: {
+      rpId: webauthnRpId,
+      origin: webauthnOrigin,
+      usingDefaults: webauthnUsingDefaults,
     },
     dispose: async () => {
       // Drained *before* disconnecting, and only because the batched writer

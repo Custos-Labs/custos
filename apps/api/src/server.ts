@@ -22,8 +22,20 @@ const logger = createLogger({ name: "verixa-api", level: config.LOG_LEVEL });
 
 // The composition root, finally constructed at runtime rather than only in
 // tests. Until this line existed, every repository, use case and mapper in
-// the workspace was unreachable from a running server.
 const container = buildContainer();
+
+const { rpId, origin, usingDefaults } = container.webauthn;
+if (usingDefaults) {
+  logger.warn(
+    { rpId, origin },
+    "WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN not set — using localhost defaults. " +
+      "Every WebAuthn registration and assertion will be rejected in production. " +
+      "Set both variables; see .env.example and docs/security/mfa-design.md.",
+  );
+} else {
+  logger.info({ rpId, origin }, "WebAuthn relying party configured");
+}
+
 const app = buildApp({ logger, container });
 
 // Close the database connection on shutdown rather than letting the process

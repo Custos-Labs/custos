@@ -43,12 +43,14 @@ symptoms.
 
 ## Schema
 
-| Variable    | Required | Default       | Notes                                     |
-| ----------- | -------- | ------------- | ----------------------------------------- |
-| `NODE_ENV`  | no       | `development` | `development` \| `test` \| `production`   |
-| `PORT`      | no       | `3000`        | coerced from string to number, 1–65535    |
-| `HOST`      | no       | `0.0.0.0`     | interface the server binds to             |
-| `LOG_LEVEL` | no       | `info`        | consumed by the logger added in Issue 008 |
+| Variable          | Required | Default                 | Notes                                                                                                                                                             |
+| ----------------- | -------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`        | no       | `development`           | `development` \| `test` \| `production`                                                                                                                           |
+| `PORT`            | no       | `3000`                  | coerced from string to number, 1–65535                                                                                                                            |
+| `HOST`            | no       | `0.0.0.0`               | interface the server binds to                                                                                                                                     |
+| `LOG_LEVEL`       | no       | `info`                  | consumed by the logger added in Issue 008                                                                                                                         |
+| `WEBAUTHN_RP_ID`  | no       | `localhost`             | read at the composition root (`apps/api/src/composition-root.ts`), not by `@verixa/config` — must be the production domain or every WebAuthn ceremony is rejected |
+| `WEBAUTHN_ORIGIN` | no       | `http://localhost:3000` | same; must be the full production origin                                                                                                                          |
 
 See `.env.example` at the repo root for a copyable starting point (`cp
 .env.example .env`). `.env` itself is git-ignored — never commit real secrets.

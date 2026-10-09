@@ -125,4 +125,11 @@ describe.skipIf(!available)("composition root", () => {
       }),
     ).resolves.toBe(1);
   });
+
+  it("exposes the resolved WebAuthn relying-party configuration", () => {
+    expect(container.webauthn).toBeDefined();
+    expect(container.webauthn.rpId).toBe("localhost");
+    expect(container.webauthn.origin).toBe("http://localhost:3000");
+    expect(typeof container.webauthn.usingDefaults).toBe("boolean");
+  });
 });
