@@ -1,3 +1,4 @@
+import { AuthorizationError, ValidationError } from "@verixa/shared-kernel";
 import type {
   FastifyBaseLogger,
   FastifyInstance,
@@ -8,6 +9,8 @@ import type {
   RawServerDefault,
 } from "fastify";
 import { z } from "zod";
+
+import { sendError } from "../http/error-response.js";
 
 const submitVerificationSchema = {
   schema: {
@@ -150,12 +153,7 @@ const decisionSchema = {
 function checkReviewer(req: FastifyRequest, reply: FastifyReply): boolean {
   const authHeader = req.headers["authorization"];
   if (!authHeader || !authHeader.includes("reviewer")) {
-    reply.status(403).send({
-      error: {
-        code: "FORBIDDEN",
-        message: "Reviewer role required",
-      },
-    });
+    sendError(reply, new AuthorizationError("Reviewer role required"));
     return false;
   }
   return true;
@@ -214,6 +212,11 @@ export function registerVerificationRoutes<TLogger extends FastifyBaseLogger>(
           message: "File size exceeds limit",
         },
       });
+    const size = data?.file ? await getStreamSize(data.file) : 1024;
+
+    if (size > 10 * 1024 * 1024) {
+      sendError(reply, new ValidationError("File size exceeds limit"));
+      return;
     }
 
     return reply.status(201).send({

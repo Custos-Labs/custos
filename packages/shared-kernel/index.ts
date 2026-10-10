@@ -26,6 +26,11 @@ export {
   TENANT_CONTEXT_SETTING,
 } from "./infrastructure/tenant-context.js";
 export {
+  toHttpError,
+  type ErrorResponseBody,
+  type HttpErrorMapping,
+} from "./infrastructure/http-error.js";
+export {
   RateLimitExceededError,
   type RateLimitKey,
   type RateLimitResult,
