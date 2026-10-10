@@ -1,5 +1,7 @@
 import { createId, type Id } from "@verixa/shared-kernel";
 
+import { MfaMethodStateTransitionError, MfaReplayDetectedError } from "../errors.js";
+
 export type MfaMethodId = Id<"MfaMethodId">;
 export type UserId = Id<"UserId">;
 export type MfaMethodType = "totp" | "webauthn" | "backup_codes";
@@ -156,7 +158,12 @@ export class MfaMethod {
   /** Moves a `pending` or `disabled` method to `active`, clearing any lockout. */
   public activate(now: Date = new Date()): this {
     if (this.props.status === "active") {
-      throw new Error("Method is already active.");
+      throw new MfaMethodStateTransitionError(
+        this.props.id,
+        this.props.status,
+        "activate",
+        "Method is already active.",
+      );
     }
     this.props = {
       ...this.props,
@@ -171,7 +178,12 @@ export class MfaMethod {
   /** Disables an enrolled method. A disabled method cannot satisfy a challenge. */
   disable(now: Date = new Date()): this {
     if (this.props.status === "disabled") {
-      throw new Error("Method is already disabled.");
+      throw new MfaMethodStateTransitionError(
+        this.props.id,
+        this.props.status,
+        "disable",
+        "Method is already disabled.",
+      );
     }
     this.props = { ...this.props, status: "disabled", updatedAt: now };
     return this;
@@ -224,7 +236,12 @@ export class MfaMethod {
    */
   recordUse(now: Date = new Date()): this {
     if (this.props.status !== "active") {
-      throw new Error("Only active methods can be used for verification.");
+      throw new MfaMethodStateTransitionError(
+        this.props.id,
+        this.props.status,
+        "verify",
+        "Only active methods can be used for verification.",
+      );
     }
     this.props = {
       ...this.props,
@@ -246,10 +263,20 @@ export class MfaMethod {
    */
   recordTotpUse(matchedStep: number, now: Date = new Date()): this {
     if (this.props.status !== "active") {
-      throw new Error("Only active methods can be used for verification.");
+      throw new MfaMethodStateTransitionError(
+        this.props.id,
+        this.props.status,
+        "verify",
+        "Only active methods can be used for verification.",
+      );
     }
     if (this.props.lastUsedStep !== null && matchedStep <= this.props.lastUsedStep) {
-      throw new Error("Replay detected: step has already been consumed.");
+      throw new MfaReplayDetectedError(
+        this.props.id,
+        matchedStep,
+        this.props.lastUsedStep,
+        "Replay detected: step has already been consumed.",
+      );
     }
     this.recordUse(now);
     this.props = { ...this.props, lastUsedStep: matchedStep };
