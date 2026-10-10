@@ -1,5 +1,5 @@
 import { Email, type User } from "@verixa/identity";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";
@@ -99,6 +99,24 @@ describe("password reset (Issues 069 and 070)", () => {
       expect(notifier.resets).toHaveLength(1);
     });
 
+    it("throws RateLimitExceededError when rate limit is exceeded", async () => {
+      const resetAt = Date.now() + 60000;
+      const blockingLimiter = {
+        check: () => Promise.resolve({ allowed: false, remaining: 0, resetAt, limit: 5 }),
+        recordFailure: () => Promise.resolve(),
+        reset: () => Promise.resolve(),
+      };
+      const limitedRequest = new RequestPasswordReset(unitOfWork, notifier, blockingLimiter);
+
+      await expect(limitedRequest.execute({ email: EMAIL })).rejects.toSatisfy((err: unknown) => {
+        expect(err).toBeInstanceOf(RateLimitExceededError);
+        const rateLimitErr = err as RateLimitExceededError;
+        expect(rateLimitErr.code).toBe("RATE_LIMIT_EXCEEDED");
+        expect(rateLimitErr.httpStatusHint).toBe(429);
+        return true;
+      });
+    });
+
     it("responds identically whether or not the account exists", async () => {
       // A reset endpoint reporting "no account with that address" is a
       // *better* enumeration oracle than the login form: no password guess is
@@ -159,6 +177,26 @@ describe("password reset (Issues 069 and 070)", () => {
   });
 
   describe("confirming (Issue 070)", () => {
+    it("throws RateLimitExceededError when rate limit is exceeded", async () => {
+      const resetAt = Date.now() + 60000;
+      const blockingLimiter = {
+        check: () => Promise.resolve({ allowed: false, remaining: 0, resetAt, limit: 5 }),
+        recordFailure: () => Promise.resolve(),
+        reset: () => Promise.resolve(),
+      };
+      const limitedConfirm = new ConfirmPasswordReset(unitOfWork, hasher, revoker, blockingLimiter);
+
+      await expect(
+        limitedConfirm.execute({ token: "some-token", newPassword: NEW_PASSWORD }),
+      ).rejects.toSatisfy((err: unknown) => {
+        expect(err).toBeInstanceOf(RateLimitExceededError);
+        const rateLimitErr = err as RateLimitExceededError;
+        expect(rateLimitErr.code).toBe("RATE_LIMIT_EXCEEDED");
+        expect(rateLimitErr.httpStatusHint).toBe(429);
+        return true;
+      });
+    });
+
     it("replaces the password", async () => {
       const rawToken = await issueToken();
 

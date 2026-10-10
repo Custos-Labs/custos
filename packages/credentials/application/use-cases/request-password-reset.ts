@@ -1,5 +1,11 @@
 import { Email } from "@verixa/identity";
-import { Result, type ValidationError, RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
+import {
+  Result,
+  RateLimitExceededError,
+  type RateLimiter,
+  type RateLimitKey,
+  type ValidationError,
+} from "@verixa/shared-kernel";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";
 import type { CredentialNotifier } from "../ports/credential-notifier.js";
@@ -68,10 +74,7 @@ export class RequestPasswordReset {
 
     const limitResult = await this.rateLimiter.check(rateLimitKey);
     if (!limitResult.allowed) {
-      throw new Error(
-        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
-          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
-      );
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
     }
 
     const emailResult = Email.create(command.email);

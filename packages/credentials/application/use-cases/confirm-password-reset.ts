@@ -1,5 +1,5 @@
 import type { User } from "@verixa/identity";
-import { Result, ValidationError } from "@verixa/shared-kernel";
+import { RateLimitExceededError, Result, ValidationError } from "@verixa/shared-kernel";
 import type { RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
 
 import { Credential } from "../../domain/entities/credential.js";
@@ -82,10 +82,7 @@ export class ConfirmPasswordReset {
 
     const limitResult = await this.rateLimiter.check(rateLimitKey);
     if (!limitResult.allowed) {
-      throw new Error(
-        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
-          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
-      );
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
     }
 
     // Policy first, before the token is looked up and before anything is

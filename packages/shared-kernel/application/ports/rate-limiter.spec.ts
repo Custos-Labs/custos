@@ -34,7 +34,7 @@ class SpyRateLimiter implements RateLimiter {
 
 describe("RateLimiter port", () => {
   describe("RateLimitExceededError", () => {
-    it("includes resetAt and limit in the error", () => {
+    it("includes resetAt and limit in the error and extends DomainError", () => {
       const key: RateLimitKey = { action: "login", identifier: "user@example.com" };
       const resetAt = Date.now() + 60000;
       const limit = 10;
@@ -42,12 +42,21 @@ describe("RateLimiter port", () => {
       const error = new RateLimitExceededError(key, resetAt, limit);
 
       expect(error.name).toBe("RateLimitExceededError");
+      expect(error.code).toBe("RATE_LIMIT_EXCEEDED");
+      expect(error.httpStatusHint).toBe(429);
       expect(error.key).toEqual(key);
       expect(error.resetAt).toBe(resetAt);
       expect(error.limit).toBe(limit);
       expect(error.message).toContain("Rate limit exceeded");
       expect(error.message).toContain("login");
       expect(error.message).toContain("user@example.com");
+
+      const json = error.toJSON();
+      expect(json.code).toBe("RATE_LIMIT_EXCEEDED");
+      expect(json.httpStatusHint).toBe(429);
+      expect(json.key).toEqual(key);
+      expect(json.resetAt).toBe(resetAt);
+      expect(json.limit).toBe(limit);
     });
 
     it("includes ISO timestamp in error message", () => {

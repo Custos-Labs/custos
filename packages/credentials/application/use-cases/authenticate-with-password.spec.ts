@@ -1,6 +1,6 @@
 import { Email, type User } from "@verixa/identity";
 import type { MfaEnforcementLevel } from "@verixa/mfa";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";
@@ -238,6 +238,26 @@ describe("AuthenticateWithPassword", () => {
 
       expect(failure.message).not.toContain(EMAIL);
       expect(failure.message).toBe("Invalid email or password.");
+    });
+
+    it("throws RateLimitExceededError when rate limit is exceeded", async () => {
+      const resetAt = Date.now() + 60000;
+      const blockingLimiter = {
+        check: () => Promise.resolve({ allowed: false, remaining: 0, resetAt, limit: 5 }),
+        recordFailure: () => Promise.resolve(),
+        reset: () => Promise.resolve(),
+      };
+      const limitedAuthenticate = new AuthenticateWithPassword(unitOfWork, hasher, blockingLimiter);
+
+      await expect(
+        limitedAuthenticate.execute({ email: EMAIL, password: PASSWORD }),
+      ).rejects.toSatisfy((err: unknown) => {
+        expect(err).toBeInstanceOf(RateLimitExceededError);
+        const rateLimitErr = err as RateLimitExceededError;
+        expect(rateLimitErr.code).toBe("RATE_LIMIT_EXCEEDED");
+        expect(rateLimitErr.httpStatusHint).toBe(429);
+        return true;
+      });
     });
   });
 

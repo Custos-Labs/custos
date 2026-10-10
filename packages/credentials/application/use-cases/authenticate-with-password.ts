@@ -1,6 +1,11 @@
 import { Email, type User, type UserStatus } from "@verixa/identity";
 import type { MfaEnforcementLevel } from "@verixa/mfa";
-import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
+import {
+  AccountLockedError,
+  AuthenticationError,
+  RateLimitExceededError,
+  Result,
+} from "@verixa/shared-kernel";
 import type { RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
 
 import type { Credential } from "../../domain/entities/credential.js";
@@ -174,10 +179,7 @@ export class AuthenticateWithPassword {
 
     const limitResult = await this.rateLimiter.check(rateLimitKey);
     if (!limitResult.allowed) {
-      throw new Error(
-        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
-          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
-      );
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
     }
 
     // A malformed address is not a validation error here, unlike everywhere

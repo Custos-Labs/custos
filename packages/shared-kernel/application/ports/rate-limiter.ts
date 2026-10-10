@@ -1,3 +1,5 @@
+import { DomainError } from "../../domain/errors.js";
+
 /**
  * RateLimiter port — cross-cutting concern for abuse-sensitive operations.
  *
@@ -50,7 +52,10 @@ export interface RateLimiter {
 }
 
 /** Thrown by use cases when rate limit is exceeded */
-export class RateLimitExceededError extends Error {
+export class RateLimitExceededError extends DomainError {
+  readonly code = "RATE_LIMIT_EXCEEDED";
+  readonly httpStatusHint = 429;
+
   constructor(
     public readonly key: RateLimitKey,
     public readonly resetAt: number,
@@ -60,6 +65,13 @@ export class RateLimitExceededError extends Error {
       `Rate limit exceeded for ${key.action} on ${key.identifier}. ` +
         `Resets at ${new Date(resetAt).toISOString()}`,
     );
-    this.name = "RateLimitExceededError";
+  }
+
+  override toJSON(): ReturnType<DomainError["toJSON"]> & {
+    key: RateLimitKey;
+    resetAt: number;
+    limit: number;
+  } {
+    return { ...super.toJSON(), key: this.key, resetAt: this.resetAt, limit: this.limit };
   }
 }
