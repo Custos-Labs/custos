@@ -1,0 +1,48 @@
+version: 2
+updates:
+  # Maintain dependencies for npm / pnpm workspace
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      eslint:
+        patterns:
+          - "eslint*"
+          - "@eslint*"
+          - "typescript-eslint"
+      commitlint:
+        patterns:
+          - "*commitlint*"
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma*"
+      vitest:
+        patterns:
+          - "vitest*"
+          - "@vitest*"
+      types:
+        patterns:
+          - "@types*"
+      stellar:
+        patterns:
+          - "@stellar*"
+
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "actions/*"
