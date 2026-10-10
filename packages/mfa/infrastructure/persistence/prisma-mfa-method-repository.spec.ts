@@ -106,6 +106,30 @@ describe.skipIf(database === undefined)("PrismaMfaMethodRepository (real Postgre
 
       const method2 = MfaMethod.createPendingTotp(userId, { value: "SECRET2" }).activate();
       await expect(repository.save(method2)).rejects.toThrow();
+  describe("lockout and replay state persistence (Issue 100)", () => {
+    it("a failed attempt survives a fresh repository read", async () => {
+      const repo = new PrismaMfaMethodRepository(prisma);
+      const userId = await setupUser();
+      const method = MfaMethod.createPendingTotp(userId, { value: "SECRET" }).activate();
+      await repo.save(method);
+
+      const loaded = await repo.findById(method.id);
+      expect(loaded).toBeDefined();
+      await repo.save(loaded!.recordFailedAttempt(new Date()));
+
+      const reloaded = await repo.findById(method.id);
+      expect(reloaded!.failedAttempts).toBe(1);
+    });
+
+    it("a replayed step is rejected after rehydration", async () => {
+      const repo = new PrismaMfaMethodRepository(prisma);
+      const userId = await setupUser();
+      const method = MfaMethod.createPendingTotp(userId, { value: "SECRET" }).activate();
+      await repo.save(method.recordTotpUse(1000, new Date()));
+
+      const reloaded = await repo.findById(method.id);
+      expect(reloaded!.lastUsedStep).toBe(1000);
+      expect(() => reloaded!.recordTotpUse(1000, new Date())).toThrow();
     });
   });
 });
