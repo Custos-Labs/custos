@@ -69,9 +69,11 @@ describe.skipIf(!available)("row-level security", () => {
     );
     await admin.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ${APP_ROLE};`);
 
+    await admin.userRoleAssignment.deleteMany({});
     await admin.invitation.deleteMany({});
     await admin.organizationMembership.deleteMany({});
     await admin.organization.deleteMany({});
+    await admin.role.deleteMany({});
     await admin.user.deleteMany({});
 
     const now = new Date();
@@ -136,15 +138,40 @@ describe.skipIf(!available)("row-level security", () => {
       ],
     });
 
+    const ROLE_ID = "00000000-0000-4000-8000-0000000000a4";
+    await admin.role.createMany({
+      data: [{ id: ROLE_ID, name: "org-admin", createdAt: now, updatedAt: now }],
+    });
+    await admin.userRoleAssignment.createMany({
+      data: [
+        {
+          id: "00000000-0000-4000-8000-0000000000a5",
+          userId: OWNER_A,
+          roleId: ROLE_ID,
+          organizationId: ORG_A,
+          assignedAt: now,
+        },
+        {
+          id: "00000000-0000-4000-8000-0000000000b5",
+          userId: OWNER_B,
+          roleId: ROLE_ID,
+          organizationId: ORG_B,
+          assignedAt: now,
+        },
+      ],
+    });
+
     app = new PrismaClient({ datasources: { db: { url: restrictedUrl() } } });
     await app.$connect();
   }, 120_000);
 
   afterAll(async () => {
     await app.$disconnect();
+    await admin.userRoleAssignment.deleteMany({});
     await admin.invitation.deleteMany({});
     await admin.organizationMembership.deleteMany({});
     await admin.organization.deleteMany({});
+    await admin.role.deleteMany({});
     await admin.user.deleteMany({});
     await admin.$disconnect();
   }, 60_000);
@@ -233,5 +260,92 @@ describe.skipIf(!available)("row-level security", () => {
     const users = await app.user.findMany();
 
     expect(users.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("isolates role assignments by tenant, even with no WHERE clause", async () => {
+    const rows = await app.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${ORG_A}, true)`;
+      return tx.userRoleAssignment.findMany();
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.organizationId).toBe(ORG_A);
+  });
+
+  it("hides another tenant's role assignments even when explicitly requested", async () => {
+    const rows = await app.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${ORG_A}, true)`;
+      return tx.userRoleAssignment.findMany({ where: { organizationId: ORG_B } });
+    });
+
+    expect(rows).toHaveLength(0);
+  });
+
+  it("refuses a role-assignment write attributed to another tenant", async () => {
+    const attempt = app.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${ORG_A}, true)`;
+      return tx.userRoleAssignment.create({
+        data: {
+          id: "00000000-0000-4000-8000-0000000000c2",
+          userId: OWNER_A,
+          roleId: "00000000-0000-4000-8000-0000000000a4",
+          organizationId: ORG_B,
+          assignedAt: new Date(),
+        },
+      });
+    });
+
+    await expect(attempt).rejects.toThrow();
+  });
+
+  it("every organization-scoped table has RLS enabled, forced, and a tenant_isolation policy", async () => {
+    // ADR-0002's required checklist, executable: a future org-scoped table
+    // added without RLS fails this test instead of failing open in
+    // production. Runs as the restricted app role, proving what the
+    // application role itself can observe.
+    const rows = await app.$queryRawUnsafe<
+      Array<{
+        table: string;
+        rls_enabled: boolean;
+        rls_forced: boolean;
+        has_tenant_policy: boolean;
+      }>
+    >(`
+      SELECT c.relname AS "table",
+             c.relrowsecurity AS "rls_enabled",
+             c.relforcerowsecurity AS "rls_forced",
+             EXISTS (
+               SELECT 1 FROM pg_policy p
+                WHERE p.polrelid = c.oid AND p.polname = 'tenant_isolation'
+             ) AS "has_tenant_policy"
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public'
+         AND c.relname IN (
+           'organizations',
+           'organization_memberships',
+           'invitations',
+           'verification_requests',
+           'user_role_assignments'
+         )
+    `);
+
+    expect(rows).toHaveLength(5);
+    for (const row of rows) {
+      expect(
+        {
+          table: row.table,
+          rls_enabled: row.rls_enabled,
+          rls_forced: row.rls_forced,
+          has_tenant_policy: row.has_tenant_policy,
+        },
+        `table ${row.table}`,
+      ).toEqual({
+        table: row.table,
+        rls_enabled: true,
+        rls_forced: true,
+        has_tenant_policy: true,
+      });
+    }
   });
 });
