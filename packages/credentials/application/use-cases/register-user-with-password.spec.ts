@@ -1,6 +1,8 @@
 import { Result } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
+import type { User } from "@verixa/identity";
+import { ConflictError, NoopRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -132,5 +134,34 @@ describe("RegisterUserWithPassword", () => {
       expect(rateLimitErr.httpStatusHint).toBe(429);
       return true;
     });
+  it("returns the pre-flight ConflictError when the write loses a duplicate-email race", async () => {
+    const uow = new InMemoryCredentialsUnitOfWork();
+    // Blind the pre-flight check: the duplicate lands between the check and
+    // the write — the shape of the real race.
+    uow.repositories.users.existsByEmail = () => Promise.resolve(false);
+    const innerSave = uow.repositories.users.save.bind(uow.repositories.users);
+    const seenEmails = new Set<string>();
+    uow.repositories.users.save = async (user: User) => {
+      const email = user.email.value;
+      if (seenEmails.has(email)) {
+        // What PrismaUserRepository.save throws via withMappedErrors on P2002.
+        throw new ConflictError("User already exists with the same unique value (email).");
+      }
+      seenEmails.add(email);
+      return innerSave(user);
+    };
+    const racing = new RegisterUserWithPassword(uow, hasher, new NoopRateLimiter());
+
+    const first = await racing.execute(VALID);
+    expect(Result.isOk(first)).toBe(true);
+
+    const second = await racing.execute(VALID);
+    expect(Result.isErr(second)).toBe(true);
+    if (Result.isErr(second)) {
+      expect(second.error).toBeInstanceOf(ConflictError);
+      expect(second.error.message).toBe(`A user with email "${VALID.email}" already exists.`);
+      expect(second.error.message).not.toContain("P2002");
+      expect(second.error.httpStatusHint).toBe(409);
+    }
   });
 });
