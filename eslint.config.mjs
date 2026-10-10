@@ -8,10 +8,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    // scripts/** holds standalone Node scripts that aren't part of any
-    // workspace package's tsconfig project (see docs/guides/database.md) —
-    // type-aware linting needs a project to check against, which these
-    // deliberately don't have.
+    // The root `scripts/**` directory holds standalone Node maintenance scripts
+    // (e.g. `scripts/db-wait.mjs`) that aren't part of any workspace package's
+    // tsconfig project (see docs/guides/database.md) — type-aware linting needs
+    // a project to check against, which root scripts deliberately lack.
+    //
+    // In ESLint flat config, "scripts/**" is root-relative and does not ignore
+    // package-level script directories. Scripts under `packages/<pkg>/scripts/`
+    // (such as in packages/audit, packages/database, and packages/identity) are
+    // covered by package tsconfigs and are linted normally.
     ignores: [
       "**/dist/**",
       "**/coverage/**",
