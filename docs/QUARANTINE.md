@@ -73,6 +73,12 @@ for this package: the 45 files are one coherent KYC/manual-review-queue design
 with a Prisma model, migration, and RLS policy already in place. The remaining
 work was ordinary: `RunAutomatedCheck` was missing from the curated index, the
 scripts were no-ops, and eslint ignored the package.
+**Benchmarks and quarantine.** Quarantined packages carry no `benchmark`
+script: `packages/sessions`' previously pointed at `scripts/benchmark-repositories.ts`,
+which never existed in the repository tree, so it was removed rather than
+left failing. The benchmark story resumes when quarantine is lifted — for
+sessions that means repository-operation latencies (p50/p95/p99) measured
+against the reconciled code, not the quarantined implementations.
 
 ## Lifted: `packages/mfa`
 
