@@ -15,9 +15,11 @@
     "benchmark": "tsx scripts/benchmark-repositories.ts"
   },
   "dependencies": {
+    "@verixa/config": "workspace:*",
     "@verixa/database": "workspace:*",
     "@verixa/shared-kernel": "workspace:*",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^12.1.0",
