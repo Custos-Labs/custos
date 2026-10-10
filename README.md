@@ -16,8 +16,8 @@ composed together by the HTTP API in `apps/api`.
 > **Status:** early, but running. Registration, login, account lockout, email
 > verification and password reset work end to end against Postgres, and the
 > audit log is anchored to Stellar. 70 of 500 planned issues are complete — see
-> [Roadmap](#roadmap). Sessions (Phase 05) are the next milestone and the
-> current limitation: login authenticates a user but does not yet issue a token.
+> [Roadmap](#roadmap). Active token issuance depends on `packages/sessions`,
+> which is currently quarantined (see [`docs/QUARANTINE.md`](docs/QUARANTINE.md)).
 
 ## Table of Contents
 

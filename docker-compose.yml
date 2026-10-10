@@ -6,12 +6,15 @@
 # docs/guides/docker.md for why that's still "dev/prod parity" and not a
 # contradiction of it.
 #
-# DATABASE_URL flows through @verixa/config (Issue 041) but no repository
-# reads from Postgres yet (that starts with Issue 046); Redis isn't used by
-# application code at all yet (wired up starting Phase 05). For now this
-# validates that all three containers start, stay healthy, reach each
-# other, and — for Postgres — that a plain TCP connection actually succeeds
-# (see scripts/db-wait.mjs and tests/integration/database.spec.ts).
+# Services and current roles:
+# - postgres: Backs the persistence layer, running Prisma migrations and RLS
+#   policies with dual databases (`verixa` for dev, `verixa_test` for test
+#   runs) and the unprivileged `verixa_app` role used by apps/api repositories.
+# - redis: Provisioned for distributed session and cache storage, but
+#   currently unused by active application code because packages/sessions is
+#   quarantined (see docs/QUARANTINE.md).
+# - apps/api: The Fastify HTTP API container wired to the database via
+#   @verixa/config and Prisma client.
 
 services:
   postgres:
