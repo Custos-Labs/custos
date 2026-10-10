@@ -5,18 +5,17 @@
 // `no-restricted-imports` rule, which enforces it.
 
 // Domain: entities
-export type { SessionId, SessionMetadata, SessionUserId } from "./domain/entities/session.js";
-export type {
-  AccessTokenReference,
-  IssuedSession,
-  SessionId,
-  SessionMetadata,
-  SessionMetadataObservation,
-  SessionUserId,
+export {
+  Session,
+  type SessionId,
+  type SessionMetadata,
+  type SessionUserId,
 } from "./domain/entities/session.js";
-export { Session } from "./domain/entities/session.js";
-export type { IssuedRefreshToken, RefreshTokenId } from "./domain/entities/refresh-token.js";
-export { RefreshToken } from "./domain/entities/refresh-token.js";
+export {
+  RefreshToken,
+  type IssuedRefreshToken,
+  type RefreshTokenId,
+} from "./domain/entities/refresh-token.js";
 
 // Domain: value objects
 export { SessionExpiryPolicy } from "./domain/value-objects/session-expiry-policy.js";
@@ -32,48 +31,38 @@ export { RefreshTokenReuseDetected } from "./domain/events/refresh-token-reuse-d
 // Application: ports (for infrastructure adapters to implement)
 export type { SessionRepository } from "./application/ports/session-repository.js";
 export type { AccessTokenPayload, TokenSigner } from "./application/ports/token-signer.js";
-export type { IssuedAccessToken, TokenSigner } from "./application/ports/token-signer.js";
 export type { RevocationList } from "./application/ports/revocation-list.js";
 export type { SessionAuditLogger } from "./application/ports/session-audit-logger.js";
 
 // Application: use cases
-export type { IssueSessionCommand, IssuedSession, IssueSessionError } from "./application/use-cases/issue-session.js";
-export { IssueSession } from "./application/use-cases/issue-session.js";
-export type {
-  RefreshAccessTokenCommand,
-  RefreshedAccessToken,
-  RefreshAccessTokenError,
-} from "./application/use-cases/refresh-access-token.js";
-export { RefreshAccessToken } from "./application/use-cases/refresh-access-token.js";
-export type { LogoutCommand, LogoutError } from "./application/use-cases/logout.js";
-export { Logout } from "./application/use-cases/logout.js";
-export type {
-  LogoutEverywhereCommand,
-  LogoutEverywhereError,
-} from "./application/use-cases/logout-everywhere.js";
-export { LogoutEverywhere } from "./application/use-cases/logout-everywhere.js";
-export type {
-  ListActiveSessionsCommand,
-  ListActiveSessionsError,
-  SessionSummary,
-} from "./application/use-cases/list-active-sessions.js";
 export {
   IssueSession,
   type IssueSessionCommand,
-  type IssueSessionResult,
+  type IssueSessionError,
+  type IssuedSession,
 } from "./application/use-cases/issue-session.js";
 export {
   RefreshAccessToken,
   type RefreshAccessTokenCommand,
-  type RefreshAccessTokenResult,
+  type RefreshAccessTokenError,
+  type RefreshedAccessToken,
 } from "./application/use-cases/refresh-access-token.js";
-export { Logout, type LogoutCommand } from "./application/use-cases/logout.js";
+export {
+  Logout,
+  type LogoutCommand,
+  type LogoutError,
+} from "./application/use-cases/logout.js";
 export {
   LogoutEverywhere,
   type LogoutEverywhereCommand,
-  type LogoutEverywhereResult,
+  type LogoutEverywhereError,
 } from "./application/use-cases/logout-everywhere.js";
-export { ListActiveSessions } from "./application/use-cases/list-active-sessions.js";
+export {
+  ListActiveSessions,
+  type ListActiveSessionsCommand,
+  type ListActiveSessionsError,
+  type SessionSummary,
+} from "./application/use-cases/list-active-sessions.js";
 
 // Infrastructure: adapters (Exported so the composition root can construct them)
 export { PrismaSessionRepository } from "./infrastructure/persistence/prisma-session-repository.js";

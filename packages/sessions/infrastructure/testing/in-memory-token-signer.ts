@@ -1,26 +1,30 @@
-import { randomUUID } from "node:crypto";
+import { Result, ValidationError } from "@verixa/shared-kernel";
 
-import type { IssuedAccessToken, TokenSigner } from "../../application/ports/token-signer.js";
-import type { SessionUserId } from "../../domain/entities/session.js";
+import type {
+  AccessTokenPayload,
+  TokenSigner,
+} from "../../application/ports/token-signer.js";
 
 /**
- * A `TokenSigner` that produces deterministic-shaped, unsigned tokens
- * instead of real JWTs, satisfying the exact same port a real (Phase 05,
- * `jose`-backed) adapter will. Exists so `IssueSession`, `Logout`, and
- * `RefreshAccessToken` never need a real signing key in their unit tests —
- * only that every issued token carries a unique `tokenId` and the requested
- * expiry, which is all these use cases observe about a token.
+ * A `TokenSigner` that issues opaque `test.<payload-json-base64>` tokens and
+ * verifies them by decoding, instead of real JWTs. Exists so use cases never
+ * need a signing key in unit tests — only that `verify` round-trips what
+ * `sign` produced and rejects anything else.
  */
 export class InMemoryTokenSigner implements TokenSigner {
-  constructor(private readonly accessTokenTtlMs: number = 15 * 60 * 1000) {}
+  private readonly issued = new Map<string, AccessTokenPayload>();
 
-  issueAccessToken(params: { userId: SessionUserId; now: Date }): Promise<IssuedAccessToken> {
-    const tokenId = randomUUID();
-    const expiresAt = new Date(params.now.getTime() + this.accessTokenTtlMs);
-    return Promise.resolve({
-      token: `fake.${params.userId}.${tokenId}`,
-      tokenId,
-      expiresAt,
-    });
+  async sign(payload: AccessTokenPayload, _ttlSeconds: number): Promise<string> {
+    const token = `test.${Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")}`;
+    this.issued.set(token, payload);
+    return token;
+  }
+
+  async verify(token: string): Promise<Result<AccessTokenPayload, ValidationError>> {
+    const payload = this.issued.get(token);
+    if (payload === undefined) {
+      return Result.err(new ValidationError("Invalid token.", { token: ["invalid"] }));
+    }
+    return Result.ok(payload);
   }
 }
