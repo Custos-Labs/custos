@@ -1,7 +1,7 @@
 import { NotFoundError, Result, ValidationError } from "@verixa/shared-kernel";
 
 import type { Role, RoleId } from "../../domain/entities/role.js";
-import type { SystemRoleImmutableError } from "../../domain/errors/system-role-immutable-error.js";
+import { SystemRoleImmutableError } from "../../domain/errors/system-role-immutable-error.js";
 import { Permission } from "../../domain/value-objects/permission.js";
 import type { RoleRepository } from "../ports/role-repository.js";
 
@@ -41,7 +41,10 @@ export class RevokePermissionFromRole {
     try {
       role.revoke(permission);
     } catch (error) {
-      return Result.err(error as SystemRoleImmutableError);
+      if (error instanceof SystemRoleImmutableError) {
+        return Result.err(error);
+      }
+      throw error;
     }
 
     await this.roleRepository.save(role);
