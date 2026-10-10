@@ -14,7 +14,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "pino": "^9.6.0"
+    "pino": "^10.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
