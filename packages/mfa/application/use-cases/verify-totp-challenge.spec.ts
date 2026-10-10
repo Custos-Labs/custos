@@ -1,4 +1,12 @@
-import { AccountLockedError, createId, Result } from "@verixa/shared-kernel";
+import {
+  AccountLockedError,
+  AuthenticationError,
+  ConflictError,
+  createId,
+  NotFoundError,
+  Result,
+  ValidationError,
+} from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
 import { MfaMethod } from "../../domain/entities/mfa-method.js";
@@ -56,7 +64,7 @@ describe("VerifyTotpChallenge", () => {
     expect(updated.failedAttempts).toBe(0);
   });
 
-  it("rejects code replay within the same or earlier step", async () => {
+  it("rejects code replay with a ConflictError", async () => {
     const { useCase, fakeRepo, savedMethods } = setup();
     // Method already used at step 1000
     const method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" })
@@ -72,6 +80,7 @@ describe("VerifyTotpChallenge", () => {
 
     expect(Result.isErr(result)).toBe(true);
     if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(ConflictError);
       expect(result.error.message).toContain("already been used");
     }
 
@@ -90,7 +99,26 @@ describe("VerifyTotpChallenge", () => {
     expect(updated2.lastUsedStep).toBe(1001);
   });
 
-  it("records a failure and enforces rate limits on invalid codes", async () => {
+  it("returns AuthenticationError for invalid TOTP codes and records failures", async () => {
+    const { useCase, fakeRepo } = setup();
+    const method = MfaMethod.createPendingTotp(createId<"UserId">(), {
+      value: "SECRET",
+    }).activate();
+    await fakeRepo.save(method);
+
+    const result = await useCase.execute({
+      methodId: method.id,
+      code: "WRONG1",
+    });
+
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(AuthenticationError);
+      expect(result.error.message).toContain("Invalid TOTP code");
+    }
+  });
+
+  it("enforces rate limits on locked methods with AccountLockedError", async () => {
     const { useCase, fakeRepo } = setup();
     let method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" }).activate();
 
@@ -107,6 +135,51 @@ describe("VerifyTotpChallenge", () => {
     expect(Result.isErr(result)).toBe(true);
     if (Result.isErr(result)) {
       expect(result.error).toBeInstanceOf(AccountLockedError);
+    }
+  });
+
+  it("returns NotFoundError when method does not exist", async () => {
+    const { useCase } = setup();
+    const result = await useCase.execute({
+      methodId: createId<"MfaMethodId">(),
+      code: "VALID1",
+    });
+
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(NotFoundError);
+      expect(result.error.message).toContain("MFA method not found");
+    }
+  });
+
+  it("returns ConflictError when method is pending or inactive", async () => {
+    const { useCase, fakeRepo } = setup();
+    const method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" });
+    await fakeRepo.save(method);
+
+    const result = await useCase.execute({
+      methodId: method.id,
+      code: "VALID1",
+    });
+
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(ConflictError);
+      expect(result.error.message).toContain("Method is not active");
+    }
+  });
+
+  it("returns ValidationError when code is malformed", async () => {
+    const { useCase } = setup();
+    const result = await useCase.execute({
+      methodId: createId<"MfaMethodId">(),
+      code: "123", // too short
+    });
+
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(ValidationError);
+      expect(result.error.message).toContain("must be 6 digits");
     }
   });
 });

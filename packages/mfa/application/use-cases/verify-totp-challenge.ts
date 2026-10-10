@@ -1,4 +1,12 @@
-import { AccountLockedError, Result, ValidationError, asId } from "@verixa/shared-kernel";
+import {
+  AccountLockedError,
+  AuthenticationError,
+  ConflictError,
+  NotFoundError,
+  Result,
+  ValidationError,
+  asId,
+} from "@verixa/shared-kernel";
 
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
@@ -8,12 +16,13 @@ export interface VerifyTotpChallengeCommand {
   readonly code: string;
 }
 
-export type VerifyTotpChallengeError = Error | AccountLockedError | ValidationError;
+export type VerifyTotpChallengeError =
+  NotFoundError | ConflictError | AuthenticationError | AccountLockedError | ValidationError;
 
 /**
  * Verifies a submitted TOTP code against an active method during login or step-up.
  *
- * Allows a minor configurable clock drift (e.g. �1 step) but strictly rejects
+ * Allows a minor configurable clock drift (e.g. ±1 step) but strictly rejects
  * code reuse within the same step. On success, updates the method's lastUsedAt
  * and lastUsedStep to prevent replay.
  */
@@ -34,11 +43,11 @@ export class VerifyTotpChallenge {
     const method = await this.mfaMethodRepository.findById(methodId);
 
     if (!method) {
-      return Result.err(new Error("MFA method not found."));
+      return Result.err(new NotFoundError("MFA method not found."));
     }
 
     if (method.status !== "active") {
-      return Result.err(new Error("Method is not active."));
+      return Result.err(new ConflictError("Method is not active."));
     }
 
     const now = new Date();
@@ -47,16 +56,16 @@ export class VerifyTotpChallenge {
     }
 
     if (!method.secret) {
-      return Result.err(new Error("MFA method is missing its secret."));
+      return Result.err(new ConflictError("MFA method is missing its secret."));
     }
 
-    // Verify code, allowing �1 drift window (30s past or future)
+    // Verify code, allowing ±1 drift window (30s past or future)
     const matchedStep = await this.totpAlgorithm.verify(method.secret, command.code, 1);
 
     if (matchedStep === null) {
       const updatedMethod = method.recordFailedAttempt(now);
       await this.mfaMethodRepository.save(updatedMethod);
-      return Result.err(new Error("Invalid TOTP code."));
+      return Result.err(new AuthenticationError("Invalid TOTP code."));
     }
 
     try {
@@ -68,7 +77,7 @@ export class VerifyTotpChallenge {
       // Replay detected
       const updatedMethod = method.recordFailedAttempt(now);
       await this.mfaMethodRepository.save(updatedMethod);
-      return Result.err(new Error("Code has already been used."));
+      return Result.err(new ConflictError("Code has already been used."));
     }
   }
 }
