@@ -5,12 +5,14 @@ import {
   Keypair,
   Memo,
   Networks,
+  NotFoundError,
   Operation,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { Result } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
+import { AnchorError } from "../../application/ports/hash-anchor.js";
 import { SigningError } from "../../application/ports/transaction-signer.js";
 import { KmsTransactionSigner } from "../signing/kms-transaction-signer.js";
 import { LocalTransactionSigner } from "../signing/local-transaction-signer.js";
@@ -168,3 +170,69 @@ interface FailOnlySigner {
   sign(digest: Uint8Array): Promise<Result<Uint8Array, SigningError>>;
   describe(): string;
 }
+
+function fakeServer(call: (ref: string) => Promise<unknown>) {
+  return {
+    transactions: () => ({
+      transaction: (ref: string) => ({ call: () => call(ref) }),
+    }),
+  };
+}
+
+function withServer(anchor: StellarHashAnchor, server: unknown): void {
+  (anchor as unknown as { server: unknown }).server = server;
+}
+
+describe("StellarHashAnchor.verify", () => {
+  const hash = "ab".repeat(32);
+  const anchorRef = "c".repeat(64);
+
+  it("returns ok(false) for a transaction Horizon does not know", async () => {
+    const anchor = new StellarHashAnchor({ network: "testnet" });
+    withServer(
+      anchor,
+      fakeServer(() => Promise.reject(new NotFoundError("Not Found", { status: 404 }))),
+    );
+
+    const result = await anchor.verify(hash, anchorRef);
+
+    expect(Result.isOk(result)).toBe(true);
+    if (Result.isOk(result)) expect(result.value).toBe(false);
+  });
+
+  it("returns err for a Horizon outage, keeping the cause", async () => {
+    const anchor = new StellarHashAnchor({ network: "testnet" });
+    const outage = new Error("socket hang up");
+    withServer(
+      anchor,
+      fakeServer(() => Promise.reject(outage)),
+    );
+
+    const result = await anchor.verify(hash, anchorRef);
+
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error).toBeInstanceOf(AnchorError);
+      expect(result.error.cause).toBe(outage);
+      expect(result.error.message).not.toContain("socket hang up");
+    }
+  });
+
+  it("returns ok(true) when the memo commits to the hash", async () => {
+    const anchor = new StellarHashAnchor({ network: "testnet" });
+    withServer(
+      anchor,
+      fakeServer(() =>
+        Promise.resolve({
+          memo_type: "hash",
+          memo: Buffer.from(hash, "hex").toString("base64"),
+        }),
+      ),
+    );
+
+    const result = await anchor.verify(hash, anchorRef);
+
+    expect(Result.isOk(result)).toBe(true);
+    if (Result.isOk(result)) expect(result.value).toBe(true);
+  });
+});

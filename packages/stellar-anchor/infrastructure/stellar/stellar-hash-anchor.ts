@@ -4,6 +4,7 @@ import {
   Horizon,
   Memo,
   Networks,
+  NotFoundError,
   Operation,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
@@ -224,26 +225,30 @@ export class StellarHashAnchor implements HashAnchor {
       return Result.err(new AnchorError("Expected a 64-character lowercase hex SHA-256 digest."));
     }
 
+    let transaction: { memo_type?: string; memo?: string };
     try {
-      const transaction = await this.server.transactions().transaction(anchorRef).call();
-
-      if (transaction.memo_type !== "hash" || transaction.memo === undefined) {
+      transaction = await this.server.transactions().transaction(anchorRef).call();
+    } catch (error) {
+      // The transaction does not exist on this network. That is a verification
+      // *answer* — the anchor reference is unknown, so the hash is not anchored
+      // there — not a verification failure. Everything else (outage, malformed
+      // response) stays an error.
+      if (error instanceof NotFoundError) {
         return Result.ok(false);
       }
-
-      // Horizon returns a MEMO_HASH memo base64-encoded; the anchored value
-      // is the raw 32 bytes, so compare in hex rather than trying to match
-      // encodings.
-      const anchoredHash = Buffer.from(transaction.memo, "base64").toString("hex");
-
-      return Result.ok(anchoredHash === hash);
-    } catch (error) {
-      return Result.err(
-        new AnchorError(`Failed to verify anchor ${anchorRef}: ${describeError(error)}`, {
-          cause: error,
-        }),
-      );
+      return Result.err(new AnchorError(`Failed to verify anchor ${anchorRef}.`, { cause: error }));
     }
+
+    if (transaction.memo_type !== "hash" || transaction.memo === undefined) {
+      return Result.ok(false);
+    }
+
+    // Horizon returns a MEMO_HASH memo base64-encoded; the anchored value
+    // is the raw 32 bytes, so compare in hex rather than trying to match
+    // encodings.
+    const anchoredHash = Buffer.from(transaction.memo, "base64").toString("hex");
+
+    return Result.ok(anchoredHash === hash);
   }
 }
 
