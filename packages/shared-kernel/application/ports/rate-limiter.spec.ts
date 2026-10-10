@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NoopRateLimiter } from "../../infrastructure/adapters/noop-rate-limiter.js";
+import { AlwaysAllowRateLimiter } from "../../infrastructure/adapters/always-allow-rate-limiter.js";
 
 import { RateLimitExceededError, type RateLimitKey, type RateLimiter } from "./rate-limiter.js";
 
@@ -127,9 +127,9 @@ describe("RateLimiter port", () => {
     });
   });
 
-  describe("NoopRateLimiter", () => {
+  describe("AlwaysAllowRateLimiter", () => {
     it("always allows requests", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const result = await noop.check({ action: "login", identifier: "user@example.com" });
 
@@ -137,7 +137,7 @@ describe("RateLimiter port", () => {
     });
 
     it("returns reasonable metrics", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const result = await noop.check({ action: "login", identifier: "user@example.com" });
 
@@ -147,7 +147,7 @@ describe("RateLimiter port", () => {
     });
 
     it("does not throw on recordFailure", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       await expect(
         noop.recordFailure({ action: "login", identifier: "user@example.com" }),
@@ -155,7 +155,7 @@ describe("RateLimiter port", () => {
     });
 
     it("does not throw on reset", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       await expect(
         noop.reset({ action: "login", identifier: "user@example.com" }),
@@ -163,7 +163,7 @@ describe("RateLimiter port", () => {
     });
 
     it("handles all action types", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const actions: RateLimitKey["action"][] = [
         "login",
@@ -179,7 +179,7 @@ describe("RateLimiter port", () => {
     });
 
     it("supports optional namespace", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const result = await noop.check({
         action: "login",
@@ -227,7 +227,7 @@ describe("RateLimiter port", () => {
 
   describe("RateLimitResult", () => {
     it("contains all required fields", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
       const result = await noop.check({ action: "login", identifier: "user@example.com" });
 
       expect(result.allowed).toBeDefined();
@@ -250,7 +250,7 @@ describe("RateLimiter port", () => {
     });
 
     it("resetAt is in the future", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const beforeCheck = Date.now();
       const result = await noop.check({ action: "login", identifier: "user@example.com" });
@@ -261,7 +261,7 @@ describe("RateLimiter port", () => {
     });
 
     it("limit is greater than or equal to remaining", async () => {
-      const noop = new NoopRateLimiter();
+      const noop = new AlwaysAllowRateLimiter();
 
       const result = await noop.check({ action: "login", identifier: "user@example.com" });
 

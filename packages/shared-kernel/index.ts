@@ -30,6 +30,7 @@ export {
   type ErrorResponseBody,
   type HttpErrorMapping,
 } from "./infrastructure/http-error.js";
+export { AlwaysAllowRateLimiter } from "./infrastructure/adapters/always-allow-rate-limiter.js";
 export {
   RateLimitExceededError,
   type RateLimitKey,

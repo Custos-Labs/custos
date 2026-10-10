@@ -10,6 +10,7 @@ import {
   Result,
 } from "@verixa/shared-kernel";
 import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";
@@ -103,13 +104,13 @@ describe("password reset (Issues 069 and 070)", () => {
     notifier = new CapturingNotifier();
     revoker = new RecordingSessionRevoker();
     hasher = new Argon2PasswordHasher(FAST);
-    request = new RequestPasswordReset(unitOfWork, notifier, new NoopRateLimiter());
-    confirm = new ConfirmPasswordReset(unitOfWork, hasher, revoker, new NoopRateLimiter());
+    request = new RequestPasswordReset(unitOfWork, notifier, new AlwaysAllowRateLimiter());
+    confirm = new ConfirmPasswordReset(unitOfWork, hasher, revoker, new AlwaysAllowRateLimiter());
 
     const registered = await new RegisterUserWithPassword(
       unitOfWork,
       hasher,
-      new NoopRateLimiter(),
+      new AlwaysAllowRateLimiter(),
     ).execute({
       email: EMAIL,
       displayName: "Alice",
@@ -312,7 +313,11 @@ describe("password reset (Issues 069 and 070)", () => {
 
       expect(Result.isOk(result)).toBe(true);
 
-      const authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+      const authenticate = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new AlwaysAllowRateLimiter(),
+      );
       await expect(
         authenticate
           .execute({ email: EMAIL, password: NEW_PASSWORD })
@@ -324,7 +329,11 @@ describe("password reset (Issues 069 and 070)", () => {
       const rawToken = await issueToken();
       await confirm.execute({ token: rawToken, newPassword: NEW_PASSWORD });
 
-      const authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+      const authenticate = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new AlwaysAllowRateLimiter(),
+      );
       const result = await authenticate.execute({ email: EMAIL, password: PASSWORD });
 
       expect(Result.isErr(result)).toBe(true);
@@ -383,7 +392,12 @@ describe("password reset (Issues 069 and 070)", () => {
     });
 
     it("rejects an expired token", async () => {
-      const shortLived = new RequestPasswordReset(unitOfWork, notifier, new NoopRateLimiter(), -1);
+      const shortLived = new RequestPasswordReset(
+        unitOfWork,
+        notifier,
+        new AlwaysAllowRateLimiter(),
+        -1,
+      );
       await shortLived.execute({ email: EMAIL });
       const rawToken = notifier.resets.at(-1)?.rawToken ?? "";
 
@@ -409,7 +423,12 @@ describe("password reset (Issues 069 and 070)", () => {
       const used = await issueToken();
       await confirm.execute({ token: used, newPassword: NEW_PASSWORD });
 
-      const shortLived = new RequestPasswordReset(unitOfWork, notifier, new NoopRateLimiter(), -1);
+      const shortLived = new RequestPasswordReset(
+        unitOfWork,
+        notifier,
+        new AlwaysAllowRateLimiter(),
+        -1,
+      );
       await shortLived.execute({ email: EMAIL });
       const expired = notifier.resets.at(-1)?.rawToken ?? "";
 
@@ -509,7 +528,11 @@ describe("password reset (Issues 069 and 070)", () => {
       expect(Result.isOk(result)).toBe(true);
 
       // Verify the new password works
-      const authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+      const authenticate = new AuthenticateWithPassword(
+        unitOfWork,
+        hasher,
+        new AlwaysAllowRateLimiter(),
+      );
       await expect(
         authenticate
           .execute({ email: EMAIL, password: NEW_PASSWORD })
