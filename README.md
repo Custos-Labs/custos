@@ -26,6 +26,7 @@ composed together by the HTTP API in `apps/api`.
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
+- [Roadmap](#roadmap)
 - [Security](#security)
 - [Contributing](#contributing)
 
@@ -179,6 +180,12 @@ pnpm format      # auto-fix formatting with Prettier
 
 See [`docs/guides/code-style.md`](docs/guides/code-style.md) for what the
 linter checks and why.
+
+## Roadmap
+
+The build order lives in [`planning/ROADMAP.md`](planning/ROADMAP.md) — the
+sequenced issue list the project is working through, detailing completed
+phases, active issues, and future milestones.
 
 ## Security
 
