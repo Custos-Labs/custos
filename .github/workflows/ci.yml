@@ -1,25 +1,16 @@
 name: CI
-
 on:
   push:
-    branches: [main]
-  pull_request:
-
+    branches:
+    - main
+  pull_request: null
 permissions:
   contents: read
-
 jobs:
   ci:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     services:
-      # Backs tests/integration/database.spec.ts (Issue 041) — a real
-      # Postgres, not a mock, so "can the app actually reach a database"
-      # is answered by an actual TCP-level connection, not an assumption.
-      # GitHub Actions runs service containers alongside the job on the
-      # same runner, reachable at localhost from job steps (this job isn't
-      # itself containerized) — no networking setup needed beyond the port
-      # mapping below.
       postgres:
         image: postgres:16-alpine
         env:
@@ -27,379 +18,173 @@ jobs:
           POSTGRES_PASSWORD: verixa
           POSTGRES_DB: verixa_test
         ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U verixa -d verixa_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-      # Backs the sessions revocation deny-list integration tests (Issue 088) —
-      # a real Redis, so "does revoke/isRevoke/TTL-expiry behave against the
-      # actual store" is answered by the store, not a fake. Same rationale and
-      # localhost reachability as the Postgres service above.
+        - 5432:5432
+        options: --health-cmd "pg_isready -U verixa -d verixa_test" --health-interval
+          5s --health-timeout 5s --health-retries 5
       redis:
         image: redis:7-alpine
         ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
+        - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout
+          5s --health-retries 5
     env:
       TEST_DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_test
-      # Prisma reads DATABASE_URL for both `generate` and `migrate` (Issue
-      # 042). Points at the same service container as TEST_DATABASE_URL —
-      # in CI there's no separate dev database to keep migrations away from,
-      # which is the whole reason the two URLs exist separately locally.
       DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_test
-      # Database-backed tests skip themselves when no Postgres is reachable,
-      # so `pnpm test` passes on a fresh clone without Docker. That's the
-      # right default locally and the wrong one here: a misconfigured service
-      # container would make every such test skip and still report success.
-      # This flag turns "no database" into a hard failure in CI only.
-      REQUIRE_DATABASE_TESTS: "1"
-      # Points the sessions Redis integration tests at the service container.
+      REQUIRE_DATABASE_TESTS: '1'
       TEST_REDIS_URL: redis://localhost:6379
-      # Same reasoning as REQUIRE_DATABASE_TESTS: Redis-backed tests skip
-      # themselves when no Redis is reachable, which is right locally and wrong
-      # here — a misconfigured service container would make them skip and still
-      # report green. This turns "no Redis" into a hard failure in CI only.
-      REQUIRE_REDIS_TESTS: "1"
+      REQUIRE_REDIS_TESTS: '1'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 22
+        cache: pnpm
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Generate Prisma client
+      run: pnpm db:generate
+    - name: Build
+      run: pnpm build
+    - name: Re-link workspace packages
+      run: pnpm install --frozen-lockfile
+    - name: Verify migrations apply to a fresh database
+      run: pnpm db:migrate:deploy
+    - name: Validate Prisma schema
+      run: pnpm --filter @verixa/database run db:validate
+    - name: Check Prisma schema formatting
+      run: pnpm --filter @verixa/database run db:format:check
+    - name: Check for schema/migration drift
+      env:
+        SHADOW_DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_shadow
+      run: 'PGPASSWORD=verixa psql -h localhost -U verixa -d postgres -c "DROP DATABASE
+        IF EXISTS verixa_shadow;"
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        PGPASSWORD=verixa psql -h localhost -U verixa -d postgres -c "CREATE DATABASE
+        verixa_shadow;"
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: pnpm
+        pnpm --filter @verixa/database run db:drift
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      # The Prisma client is generated, not committed (it's platform-specific
-      # — see .gitignore), so it has to be generated before anything that
-      # imports @verixa/database is built, typechecked, or tested. Same
-      # ordering principle as the build step below, one level earlier.
-      - name: Generate Prisma client
-        run: pnpm db:generate
-
-      # Every workspace package must be built before anything that imports
-      # it can be reliably linted, typechecked, or tested — see
-      # docs/guides/typescript-conventions.md and docs/guides/ci-cd.md for
-      # why this isn't just belt-and-suspenders: package.json "exports"
-      # subpaths (unlike "main") have no fallback when the target file is
-      # missing, so type-aware linting fails outright, not gracefully, on
-      # an unbuilt dependency.
-      - name: Build
-        run: pnpm build
-
-      # Re-sync injected workspace packages after building them.
-      #
-      # `injectWorkspacePackages: true` (required for `pnpm deploy`, which
-      # builds the Docker image) makes pnpm *copy* some workspace packages into
-      # their dependents' node_modules rather than symlinking. Which ones get
-      # copied is decided by peer-dependency resolution -- @verixa/audit and
-      # @verixa/stellar-anchor are copied because the Stellar SDK pulls
-      # `debug`/`supports-color` peers, while @verixa/identity is symlinked.
-      #
-      # Those copies are made during install, when no package has a `dist` yet.
-      # pnpm refreshes them before running a dependent's own script, so a
-      # package that builds gets fresh copies -- but `tests` has no build
-      # script, so its copies stayed empty and every integration spec failed
-      # with "Failed to resolve entry for package @verixa/audit".
-      #
-      # Invisible locally, because a developer's node_modules has been through
-      # an install *after* a build at some point. Only a clean checkout hits it.
-      - name: Re-link workspace packages
-        run: pnpm install --frozen-lockfile
-
-      # Proves the migration pipeline actually works end to end against a
-      # real Postgres: Prisma connects using DATABASE_URL, creates its
-      # _prisma_migrations tracking table, and applies every migration in
-      # order. There are no migrations yet (no models until Issue 043), so
-      # today this verifies the wiring rather than any schema — which is
-      # exactly what Issue 042 is for. It starts catching real regressions
-      # the moment the first table lands.
-      - name: Verify migrations apply to a fresh database
-        run: pnpm db:migrate:deploy
-
-      # Schema hygiene (Issue 058). `validate` catches a schema that isn't
-      # legal Prisma; `format --check` keeps the file from drifting into
-      # whatever each contributor's editor does.
-      - name: Validate Prisma schema
-        run: pnpm --filter @verixa/database run db:validate
-
-      - name: Check Prisma schema formatting
-        run: pnpm --filter @verixa/database run db:format:check
-
-      # Drift detection: does replaying every migration actually produce the
-      # schema.prisma in the repo? They diverge when someone edits the schema
-      # and forgets to generate a migration — the edit works locally (the
-      # client is generated from schema.prisma) and then fails in production,
-      # where only migrations ran. Catching it at merge is the entire point.
-      #
-      # Needs a scratch database to replay migrations into; the service
-      # container above provides one.
-      - name: Check for schema/migration drift
-        env:
-          SHADOW_DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_shadow
-        run: |
-          PGPASSWORD=verixa psql -h localhost -U verixa -d postgres -c "DROP DATABASE IF EXISTS verixa_shadow;"
-          PGPASSWORD=verixa psql -h localhost -U verixa -d postgres -c "CREATE DATABASE verixa_shadow;"
-          pnpm --filter @verixa/database run db:drift
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      # packages/identity is the first fully-built bounded context, and
-      # carries a per-package coverage floor (see vitest.config.ts) as the
-      # template for future contexts — enforced here, separately from the
-      # plain `pnpm test` above, since coverage collection isn't free and
-      # doesn't need to run for every package on every push yet.
-      - name: Identity coverage gate
-        run: pnpm --filter @verixa/identity run test:coverage
-
-      # Sessions coverage is intentionally not enforced while @verixa/sessions
-      # remains quarantined: its test:coverage script is a successful no-op.
-      # Do not show a green coverage gate until the package is restored and
-      # the script executes real coverage assertions (see packages/sessions/QUARANTINE.md).
-      # packages/credentials is the second fully-built bounded context,
-      # following the Phase 02 coverage-gate pattern established in Issue 037.
-      # Enforced separately from the plain `pnpm test` above to keep coverage
-      # collection overhead isolated to contexts that require it.
-      - name: Credentials coverage gate
-        run: pnpm --filter @verixa/credentials run test:coverage
-
-      # packages/audit is the third context under the Phase 02 coverage-gate
-      # pattern (Issue 037), applied in Issue 197. The floor matters more here
-      # than anywhere else in the monorepo: this is the code that decides
-      # whether tampering is *detectable*, and an untested branch in chain
-      # verification is a security property that silently does not hold. The
-      # gate excludes the Prisma adapters and the operator CLI for the reason
-      # stated in packages/audit/vitest.config.ts — they need a live Postgres,
-      # and are covered by the database-backed suite instead.
-      - name: Audit coverage gate
-        run: pnpm --filter @verixa/audit run test:coverage
-
-  # Verifies the *other* database strategy. The `ci` job above points
-  # TEST_DATABASE_URL at a service container, so it never exercises the
-  # Testcontainers path in database-harness.ts (Issue 047). This job
-  # deliberately omits TEST_DATABASE_URL, forcing the harness to start its own
-  # ephemeral Postgres via Docker — otherwise that code would ship untested
-  # and only fail for a contributor running tests without compose up.
-  #
-  # REQUIRE_DATABASE_TESTS=1 makes it a hard failure rather than a skip, so
-  # "Testcontainers silently didn't work" cannot pass as green.
+        '
+    - name: Lint
+      run: pnpm lint
+    - name: Check formatting
+      run: pnpm format:check
+    - name: Typecheck
+      run: pnpm typecheck
+    - name: Test
+      run: pnpm test
+    - name: Identity coverage gate
+      run: pnpm --filter @verixa/identity run test:coverage
+    - name: Credentials coverage gate
+      run: pnpm --filter @verixa/credentials run test:coverage
+    - name: Audit coverage gate
+      run: pnpm --filter @verixa/audit run test:coverage
   testcontainers:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
-      REQUIRE_DATABASE_TESTS: "1"
+      REQUIRE_DATABASE_TESTS: '1'
       DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa_placeholder
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm db:generate
-
-      - name: Build
-        run: pnpm build
-
-      # Re-sync injected workspace packages after building them.
-      #
-      # `injectWorkspacePackages: true` (required for `pnpm deploy`, which
-      # builds the Docker image) makes pnpm *copy* some workspace packages into
-      # their dependents' node_modules rather than symlinking. Which ones get
-      # copied is decided by peer-dependency resolution -- @verixa/audit and
-      # @verixa/stellar-anchor are copied because the Stellar SDK pulls
-      # `debug`/`supports-color` peers, while @verixa/identity is symlinked.
-      #
-      # Those copies are made during install, when no package has a `dist` yet.
-      # pnpm refreshes them before running a dependent's own script, so a
-      # package that builds gets fresh copies -- but `tests` has no build
-      # script, so its copies stayed empty and every integration spec failed
-      # with "Failed to resolve entry for package @verixa/audit".
-      #
-      # Invisible locally, because a developer's node_modules has been through
-      # an install *after* a build at some point. Only a clean checkout hits it.
-      - name: Re-link workspace packages
-        run: pnpm install --frozen-lockfile
-
-      # These packages own Prisma repository contract suites that need a
-      # real database.
-      - name: Run identity repository contract tests against Testcontainers Postgres
-        run: pnpm --filter @verixa/identity run test
-
-      - name: Run authorization repository contract tests against Testcontainers Postgres
-        run: pnpm --filter @verixa/authorization run test
-
-  # Verifies the *compose* stack's database roles, which nothing else covers.
-  #
-  # The `ci` job talks to a bare service container and the `docker` job builds
-  # the production image; neither runs docker-compose.yml, so until this
-  # existed the init scripts in infra/postgres/ were unexecuted code. That
-  # matters more than an ordinary untested script: they are what stops the API
-  # connecting as a superuser, and a superuser bypasses row level security
-  # entirely — so a mistake there disables every tenant-isolation policy
-  # silently, with nothing failing anywhere. The existing RLS suite does not
-  # cover it either, since it creates its own role and therefore tests a
-  # connection the application never uses.
-  #
-  # Deliberately does not boot the `api` service. That means a full install
-  # and build inside the container, for a slower and flakier version of what
-  # the `docker` job already proves. What is unproven here is narrower: does
-  # the role get created, is it actually unprivileged, and does it have
-  # exactly the grants the application needs.
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 22
+        cache: pnpm
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Generate Prisma client
+      run: pnpm db:generate
+    - name: Build
+      run: pnpm build
+    - name: Re-link workspace packages
+      run: pnpm install --frozen-lockfile
+    - name: Run identity repository contract tests against Testcontainers Postgres
+      run: pnpm --filter @verixa/identity run test
+    - name: Run authorization repository contract tests against Testcontainers Postgres
+      run: pnpm --filter @verixa/authorization run test
   compose-database-roles:
     timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 22
+        cache: pnpm
+    - name: Start Postgres from docker-compose.yml
+      run: docker compose up -d --wait postgres
+    - name: Confirm compose points the API at the unprivileged role
+      run: "set -eu\ndocker compose config --format json > compose.resolved.json\n\
+        url=\"$(python3 -c \"import json; print(json.load(open('compose.resolved.json'))['services']['api']['environment']['DATABASE_URL'])\"\
+        )\"\necho \"api DATABASE_URL: $url\"\ncase \"$url\" in\n  postgres://verixa_app:*)\
+        \ ;;\n  *)\n    echo \"::error::the api service must connect as verixa_app,\
+        \ not as the superuser\"\n    exit 1\n    ;;\nesac\n"
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Generate the Prisma client
+      run: pnpm --filter @verixa/database run db:generate
+    - name: Apply migrations as the owner
+      run: pnpm --filter @verixa/database run db:migrate:deploy
+    - name: The app role exists and is unprivileged
+      run: "set -eu\nattrs=\"$(docker compose exec -T postgres psql -U verixa -d verixa\
+        \ -tAX -c \"SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM\
+        \ pg_roles WHERE rolname = 'verixa_app'\")\"\necho \"verixa_app (super|bypassrls|createdb|createrole):\
+        \ $attrs\"\nif [ -z \"$attrs\" ]; then\n  echo \"::error::verixa_app was not\
+        \ created — did the init script run?\"\n  exit 1\nfi\nif [ \"$attrs\" != \"\
+        f|f|f|f\" ]; then\n  echo \"::error::verixa_app must be NOSUPERUSER NOBYPASSRLS\
+        \ NOCREATEDB NOCREATEROLE\"\n  exit 1\nfi\n"
+    - name: The app role can read and write application tables
+      run: 'set -eu
 
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1
+        -c "INSERT INTO users (id, email, display_name, status, created_at, updated_at)
+        VALUES (gen_random_uuid(), ''role-check@example.com'', ''Role Check'', ''active'',
+        now(), now());"
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: pnpm
+        docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1
+        -c "SELECT count(*) FROM users;"
 
-      - name: Start Postgres from docker-compose.yml
-        run: docker compose up -d --wait postgres
-
-      - name: Confirm compose points the API at the unprivileged role
-        run: |
-          set -eu
-          docker compose config --format json > compose.resolved.json
-          url="$(python3 -c "import json; print(json.load(open('compose.resolved.json'))['services']['api']['environment']['DATABASE_URL'])")"
-          echo "api DATABASE_URL: $url"
-          case "$url" in
-            postgres://verixa_app:*) ;;
-            *)
-              echo "::error::the api service must connect as verixa_app, not as the superuser"
-              exit 1
-              ;;
-          esac
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate the Prisma client
-        run: pnpm --filter @verixa/database run db:generate
-
-      # As the owner, which is the split being tested: DDL needs `verixa`, the
-      # application gets `verixa_app`. This also exercises the ALTER DEFAULT
-      # PRIVILEGES lines, the easy part to get wrong — GRANT ON ALL TABLES
-      # covers only tables that exist when it runs, and at init time every
-      # table in the schema is still in the future.
-      - name: Apply migrations as the owner
-        run: pnpm --filter @verixa/database run db:migrate:deploy
-
-      - name: The app role exists and is unprivileged
-        run: |
-          set -eu
-          attrs="$(docker compose exec -T postgres psql -U verixa -d verixa -tAX -c "SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = 'verixa_app'")"
-          echo "verixa_app (super|bypassrls|createdb|createrole): $attrs"
-          if [ -z "$attrs" ]; then
-            echo "::error::verixa_app was not created — did the init script run?"
-            exit 1
-          fi
-          if [ "$attrs" != "f|f|f|f" ]; then
-            echo "::error::verixa_app must be NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE"
-            exit 1
-          fi
-
-      - name: The app role can read and write application tables
-        run: |
-          set -eu
-          docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1 -c "INSERT INTO users (id, email, display_name, status, created_at, updated_at) VALUES (gen_random_uuid(), 'role-check@example.com', 'Role Check', 'active', now(), now());"
-          docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM users;"
-
-      # The point of the whole exercise. `organizations` has RLS enabled and
-      # forced, so without app.current_organization_id set this insert must be
-      # refused. A superuser connection sails straight through it, which is
-      # exactly the regression being guarded against.
-      - name: The app role is subject to row level security
-        run: |
-          set -eu
-          if docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1 -c "INSERT INTO organizations (id, name, slug, owner_id, status, created_at, updated_at) SELECT gen_random_uuid(), 'Bypass Check', 'bypass-check', id, 'active', now(), now() FROM users LIMIT 1;"; then
-            echo "::error::verixa_app bypassed row level security — tenant isolation is not enforced"
-            exit 1
-          fi
-          echo "insert refused by row level security, as required"
-
-      - name: The app role cannot issue DDL
-        run: |
-          set -eu
-          if docker compose exec -T postgres psql -U verixa_app -d verixa -v ON_ERROR_STOP=1 -c "CREATE TABLE should_not_exist (id uuid PRIMARY KEY);"; then
-            echo "::error::verixa_app must not be able to create tables"
-            exit 1
-          fi
-          echo "DDL refused, as required"
-
-      - name: Stop the stack
-        if: always()
-        run: docker compose down -v || true
-
+        '
+    - name: The app role is subject to row level security
+      run: "set -eu\nif docker compose exec -T postgres psql -U verixa_app -d verixa\
+        \ -v ON_ERROR_STOP=1 -c \"INSERT INTO organizations (id, name, slug, owner_id,\
+        \ status, created_at, updated_at) SELECT gen_random_uuid(), 'Bypass Check',\
+        \ 'bypass-check', id, 'active', now(), now() FROM users LIMIT 1;\"; then\n\
+        \  echo \"::error::verixa_app bypassed row level security — tenant isolation\
+        \ is not enforced\"\n  exit 1\nfi\necho \"insert refused by row level security,\
+        \ as required\"\n"
+    - name: The app role cannot issue DDL
+      run: "set -eu\nif docker compose exec -T postgres psql -U verixa_app -d verixa\
+        \ -v ON_ERROR_STOP=1 -c \"CREATE TABLE should_not_exist (id uuid PRIMARY KEY);\"\
+        ; then\n  echo \"::error::verixa_app must not be able to create tables\"\n\
+        \  exit 1\nfi\necho \"DDL refused, as required\"\n"
+    - name: Stop the stack
+      if: always()
+      run: docker compose down -v || true
   docker:
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Build image
-        run: docker build -f apps/api/Dockerfile -t verixa-api:ci .
-
-      - name: Run container
-        run: |
-          docker run -d --name verixa-api -p 3000:3000 \
-            -e SESSION_ACCESS_TOKEN_SECRET="ci-smoke-test-secret-at-least-32-characters" \
-            verixa-api:ci
-
-      - name: Wait for /health
-        run: |
-          for _ in $(seq 1 20); do
-            if curl -sf http://localhost:3000/health; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::verixa-api did not become healthy in time"
-          docker logs verixa-api
-          exit 1
-
-      - name: Verify the container does not run as root
-        run: |
-          user="$(docker exec verixa-api whoami)"
-          echo "Container user: $user"
-          if [ "$user" = "root" ]; then
-            echo "::error::apps/api container must not run as root"
-            exit 1
-          fi
-
-      - name: Stop container
-        if: always()
-        run: docker rm -f verixa-api || true
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - name: Build image
+      run: docker build -f apps/api/Dockerfile -t verixa-api:ci .
+    - name: Run container
+      run: "docker run -d --name verixa-api -p 3000:3000 \\\n  -e SESSION_ACCESS_TOKEN_SECRET=\"\
+        ci-smoke-test-secret-at-least-32-characters\" \\\n  verixa-api:ci\n"
+    - name: Wait for /health
+      run: "for _ in $(seq 1 20); do\n  if curl -sf http://localhost:3000/health;\
+        \ then\n    exit 0\n  fi\n  sleep 1\ndone\necho \"::error::verixa-api did\
+        \ not become healthy in time\"\ndocker logs verixa-api\nexit 1\n"
+    - name: Verify the container does not run as root
+      run: "user=\"$(docker exec verixa-api whoami)\"\necho \"Container user: $user\"\
+        \nif [ \"$user\" = \"root\" ]; then\n  echo \"::error::apps/api container\
+        \ must not run as root\"\n  exit 1\nfi\n"
+    - name: Stop container
+      if: always()
+      run: docker rm -f verixa-api || true
