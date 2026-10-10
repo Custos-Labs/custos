@@ -3,6 +3,7 @@ import { createLogger, type Logger } from "@verixa/shared-kernel";
 import Fastify from "fastify";
 
 import type { Container } from "./composition-root.js";
+import { sendError, type ErrorResponseBody } from "./http/error-response.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerVerificationRoutes } from "./routes/verification.js";
 
@@ -53,6 +54,33 @@ export function buildApp(options: BuildAppOptions = {}) {
         removeAdditional: false,
       },
     },
+  });
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (reply.sent) {
+      return;
+    }
+
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      (error as { code?: unknown }).code === "FST_ERR_VALIDATION"
+    ) {
+      const message =
+        "message" in error && typeof error.message === "string"
+          ? error.message
+          : "Validation failed.";
+      const body: ErrorResponseBody = {
+        error: {
+          code: "VALIDATION_FAILED",
+          message,
+        },
+      };
+      void reply.status(400).send(body);
+      return;
+    }
+
+    sendError(reply, error);
   });
 
   app.get("/health", () => {
