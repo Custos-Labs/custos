@@ -97,6 +97,12 @@ export {
   type RequestMoreInformationCommand,
   type RequestMoreInformationError,
 } from "./application/use-cases/request-more-information.js";
+export {
+  RunAutomatedCheck,
+  type RunAutomatedCheckCommand,
+  type RunAutomatedCheckError,
+  type RunAutomatedCheckResult,
+} from "./application/use-cases/run-automated-check.js";
 
 // Infrastructure: adapters. Exported so the composition root can construct
 // them — it is the one place allowed to know which concrete implementation is

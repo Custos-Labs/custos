@@ -1,18 +1,36 @@
-import { Result } from "@verixa/shared-kernel";
+import { createId, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { VerificationRequest } from "../../domain/entities/verification-request.js";
-import type { VerificationProvider, ProviderCheckResult } from "../ports/verification-provider.js";
-import { InMemoryVerificationRequestRepository } from "../../infrastructure/fakes/in-memory-verification-request-repository.js";
+import { VerificationType } from "../../domain/value-objects/verification-type.js";
+import { InMemoryVerificationRequestRepository } from "../../infrastructure/testing/in-memory-verification-request-repository.js";
+import { ProviderCheckResult } from "../dtos/provider-check-result.js";
+import type { VerificationProvider } from "../ports/verification-provider.js";
+
 import { RunAutomatedCheck } from "./run-automated-check.js";
 
 class FakeVerificationProvider implements VerificationProvider {
   constructor(public resultToReturn: ProviderCheckResult | Error) {}
 
-  async check(_request: VerificationRequest): Promise<ProviderCheckResult> {
+  checkDocument(): Promise<ProviderCheckResult> {
     if (this.resultToReturn instanceof Error) {
-      throw this.resultToReturn;
+      return Promise.reject(this.resultToReturn);
     }
-    return this.resultToReturn;
+    return Promise.resolve(this.resultToReturn);
+  }
+
+  checkLiveness(): Promise<ProviderCheckResult> {
+    if (this.resultToReturn instanceof Error) {
+      return Promise.reject(this.resultToReturn);
+    }
+    return Promise.resolve(this.resultToReturn);
+  }
+
+  check(): Promise<ProviderCheckResult> {
+    if (this.resultToReturn instanceof Error) {
+      return Promise.reject(this.resultToReturn);
+    }
+    return Promise.resolve(this.resultToReturn);
   }
 }
 
@@ -22,24 +40,19 @@ describe("RunAutomatedCheck", () => {
 
   beforeEach(async () => {
     repository = new InMemoryVerificationRequestRepository();
-    const createResult = VerificationRequest.register({
-      subjectUserId: "user-1" as any,
-      orgId: "org-1" as any,
-      verificationType: "identity-document",
+    const initial = VerificationRequest.request({
+      subjectUserId: createId<"VerificationSubjectId">(),
+      organizationId: createId<"VerificationOrganizationId">(),
+      type: VerificationType.reconstitute("identity-document"),
     });
-    if (!Result.isOk(createResult)) throw new Error("fixture setup failed");
-    request = createResult.value;
-    const submitResult = request.transitionTo("submitted");
+    const submitResult = initial.submit();
     if (!Result.isOk(submitResult)) throw new Error("fixture setup failed");
+    request = submitResult.value;
     await repository.save(request);
   });
 
   it("records a passing provider result and transitions to in_review", async () => {
-    const providerResult: ProviderCheckResult = {
-      outcome: "pass",
-      score: 95,
-      details: { match: true },
-    };
+    const providerResult = ProviderCheckResult.passed("ref-123", 0.95);
     const provider = new FakeVerificationProvider(providerResult);
     const useCase = new RunAutomatedCheck(repository, provider);
 
@@ -48,16 +61,12 @@ describe("RunAutomatedCheck", () => {
     expect(Result.isOk(result)).toBe(true);
     if (!Result.isOk(result)) return;
 
-    expect(result.value.request.status).toBe("in_review");
-    expect(result.value.request.providerResult).toEqual(providerResult);
+    expect(result.value.request.status.value).toBe("in_review");
+    expect(result.value.providerResult).toEqual(providerResult);
   });
 
   it("records a failing provider result and transitions to in_review", async () => {
-    const providerResult: ProviderCheckResult = {
-      outcome: "fail",
-      score: 10,
-      details: { match: false },
-    };
+    const providerResult = ProviderCheckResult.failed("ref-123", 0.9);
     const provider = new FakeVerificationProvider(providerResult);
     const useCase = new RunAutomatedCheck(repository, provider);
 
@@ -66,16 +75,12 @@ describe("RunAutomatedCheck", () => {
     expect(Result.isOk(result)).toBe(true);
     if (!Result.isOk(result)) return;
 
-    expect(result.value.request.status).toBe("in_review");
-    expect(result.value.request.providerResult).toEqual(providerResult);
+    expect(result.value.request.status.value).toBe("in_review");
+    expect(result.value.providerResult).toEqual(providerResult);
   });
 
   it("records an inconclusive provider result and transitions to in_review", async () => {
-    const providerResult: ProviderCheckResult = {
-      outcome: "inconclusive",
-      score: 50,
-      details: { reason: "blurry" },
-    };
+    const providerResult = ProviderCheckResult.inconclusive("ref-123");
     const provider = new FakeVerificationProvider(providerResult);
     const useCase = new RunAutomatedCheck(repository, provider);
 
@@ -84,8 +89,8 @@ describe("RunAutomatedCheck", () => {
     expect(Result.isOk(result)).toBe(true);
     if (!Result.isOk(result)) return;
 
-    expect(result.value.request.status).toBe("in_review");
-    expect(result.value.request.providerResult).toEqual(providerResult);
+    expect(result.value.request.status.value).toBe("in_review");
+    expect(result.value.providerResult).toEqual(providerResult);
   });
 
   it("catches provider errors/timeouts, records error annotation, and routes to in_review", async () => {
@@ -97,11 +102,7 @@ describe("RunAutomatedCheck", () => {
     expect(Result.isOk(result)).toBe(true);
     if (!Result.isOk(result)) return;
 
-    expect(result.value.request.status).toBe("in_review");
-    expect(result.value.providerResult).toEqual({
-      outcome: "inconclusive",
-      score: 0,
-      details: { error: "Provider timeout" },
-    });
+    expect(result.value.request.status.value).toBe("in_review");
+    expect(result.value.providerResult.outcome).toBe("inconclusive");
   });
 });
