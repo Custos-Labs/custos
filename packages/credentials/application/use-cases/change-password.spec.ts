@@ -1,18 +1,10 @@
 import { Email, type User } from "@verixa/identity";
-import { Result, asId } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import {
+  AlwaysAllowRateLimiter,
   AuthenticationError,
-  NoopRateLimiter,
-  Result,
-  ValidationError,
-  asId,
-} from "@verixa/shared-kernel";
-import { AlwaysAllowRateLimiter, Result, asId } from "@verixa/shared-kernel";
-import {
-  NoopRateLimiter,
   RateLimitExceededError,
   Result,
+  ValidationError,
   asId,
   type RateLimitKey,
   type RateLimitResult,

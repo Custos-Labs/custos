@@ -2,10 +2,10 @@ name: Contributor checks
 on:
   pull_request:
     types:
-    - opened
-    - synchronize
-    - reopened
-    - ready_for_review
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
 concurrency:
   group: contributor-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -19,252 +19,234 @@ jobs:
     name: Architecture boundaries
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        fetch-depth: 0
-    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-      with:
-        node-version: 22
-        cache: pnpm
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-    - name: Domain and application layers must not import infrastructure
-      run: "set -eu\nif pnpm lint 2>&1 | tee lint.log | grep -q \"must not import\
-        \ infrastructure\"; then\n  echo \"::error::A domain or application file imports\
-        \ infrastructure.\"\n  echo \"\"\n  echo \"Domain and application code must\
-        \ not reach for Prisma, Fastify,\"\n  echo \"the Stellar SDK, or anything\
-        \ under infrastructure/.\"\n  echo \"\"\n  echo \"A domain entity that imports\
-        \ Prisma cannot be unit-tested without\"\n  echo \"a database, and a use case\
-        \ that imports Fastify cannot be reused\"\n  echo \"outside HTTP. At that\
-        \ point the ports are decoration.\"\n  echo \"\"\n  echo \"The fix is almost\
-        \ always: define an interface in\"\n  echo \"application/ports/, depend on\
-        \ that, and let the composition root\"\n  echo \"in apps/api/src/composition-root.ts\
-        \ supply the real thing.\"\n  echo \"\"\n  echo \"See docs/guides/domain-modeling.md.\
-        \ Ask on the PR if unsure —\"\n  echo \"this one is genuinely subtle and getting\
-        \ it wrong is normal.\"\n  grep \"must not import infrastructure\" lint.log\
-        \ || true\n  exit 1\nfi\necho \"Layering respected.\"\n"
-    - name: New repository adapters must run the contract suite
-      run: "set -eu\nadapters=\"$(git diff --name-only origin/${{ github.base_ref\
-        \ }}...HEAD \\\n  | grep -E 'infrastructure/persistence/.*repository\\.ts$'\
-        \ \\\n  | grep -v '\\.spec\\.ts$' || true)\"\n\nif [ -z \"$adapters\" ]; then\n\
-        \  echo \"No new or changed repository adapters.\"\n  exit 0\nfi\n\necho \"\
-        Changed repository adapters:\"\necho \"$adapters\"\necho \"\"\n\nif grep -rq\
-        \ \"contract\" --include=\"*.spec.ts\" packages/*/infrastructure/persistence/\
-        \ 2>/dev/null; then\n  echo \"Contract suites are present.\"\nelse\n  echo\
-        \ \"::warning::Changed a repository adapter without a contract test in sight.\"\
-        \n  echo \"Every adapter should pass the shared contract suite — see\"\n \
-        \ echo \"packages/identity/infrastructure/testing/contracts/.\"\nfi\n"
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        fetch-depth: 0
-    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
-    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-      with:
-        node-version: 22
-        cache: pnpm
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Domain and application layers must not import infrastructure
+        run: "set -eu\nif pnpm lint 2>&1 | tee lint.log | grep -q \"must not import\
+          \ infrastructure\"; then\n  echo \"::error::A domain or application file imports\
+          \ infrastructure.\"\n  echo \"\"\n  echo \"Domain and application code must\
+          \ not reach for Prisma, Fastify,\"\n  echo \"the Stellar SDK, or anything\
+          \ under infrastructure/.\"\n  echo \"\"\n  echo \"A domain entity that imports\
+          \ Prisma cannot be unit-tested without\"\n  echo \"a database, and a use case\
+          \ that imports Fastify cannot be reused\"\n  echo \"outside HTTP. At that\
+          \ point the ports are decoration.\"\n  echo \"\"\n  echo \"The fix is almost\
+          \ always: define an interface in\"\n  echo \"application/ports/, depend on\
+          \ that, and let the composition root\"\n  echo \"in apps/api/src/composition-root.ts\
+          \ supply the real thing.\"\n  echo \"\"\n  echo \"See docs/guides/domain-modeling.md.\
+          \ Ask on the PR if unsure —\"\n  echo \"this one is genuinely subtle and getting\
+          \ it wrong is normal.\"\n  grep \"must not import infrastructure\" lint.log\
+          \ || true\n  exit 1\nfi\necho \"Layering respected.\"\n"
+      - name: New repository adapters must run the contract suite
+        run: "set -eu\nadapters=\"$(git diff --name-only origin/${{ github.base_ref\
+          \ }}...HEAD \\\n  | grep -E 'infrastructure/persistence/.*repository\\.ts$'\
+          \ \\\n  | grep -v '\\.spec\\.ts$' || true)\"\n\nif [ -z \"$adapters\" ]; then\n\
+          \  echo \"No new or changed repository adapters.\"\n  exit 0\nfi\n\necho \"\
+          Changed repository adapters:\"\necho \"$adapters\"\necho \"\"\n\nif grep -rq\
+          \ \"contract\" --include=\"*.spec.ts\" packages/*/infrastructure/persistence/\
+          \ 2>/dev/null; then\n  echo \"Contract suites are present.\"\nelse\n  echo\
+          \ \"::warning::Changed a repository adapter without a contract test in sight.\"\
+          \n  echo \"Every adapter should pass the shared contract suite — see\"\n \
+          \ echo \"packages/identity/infrastructure/testing/contracts/.\"\nfi\n"
   secrets:
     timeout-minutes: 15
     name: No secrets committed
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        fetch-depth: 0
-    - name: Scan the diff for credentials
-      run: "set -eu\n# Include workflow changes: CI definitions can contain live credentials.\n\
-        diff=\"$(git diff origin/${{ github.base_ref }}...HEAD -- . || true)\"\n\n\
-        # Suppress only the repository's exact non-production smoke-test\n# placeholder,\
-        \ never arbitrary values named SESSION_ACCESS_TOKEN_SECRET.\ndiff=\"$(printf\
-        \ '%s\\n' \"$diff\" | sed 's/ci-smoke-test-secret-at-least-32-characters/CI_TEST/g')\"\
-        \n\n# Deliberately narrow. A scanner that fires on every base64 string\n#\
-        \ gets ignored within a week, and an ignored scanner is worse than\n# none\
-        \ because it produces the feeling of coverage.\nif printf '%s' \"$diff\" |\
-        \ grep -nE '^\\+.*([A-Z_]*(SECRET|TOKEN|API_KEY|PRIVATE_KEY)[A-Z_]*|-----BEGIN\
-        \ [A-Z ]*PRIVATE KEY-----)[^A-Z_]*[=:][[:space:]]*[\"'\"'\"'][^\"'\"'\"']{16,}'\
-        \ ; then\n  echo \"::error::What looks like a real secret is being committed.\"\
-        \n  echo \"Use an environment variable and document it in .env.example.\"\n\
-        \  exit 1\nfi\n\n# Stellar secret keys have a distinctive shape: S + 55 base32\
-        \ chars.\nif printf '%s' \"$diff\" | grep -nE '^\\+.*\\bS[A-Z2-7]{55}\\b';\
-        \ then\n  echo \"::error::That looks like a Stellar secret key.\"\n  echo\
-        \ \"Never commit one, even for testnet — throwaway keys get reused.\"\n  exit\
-        \ 1\nfi\n\necho \"No secrets detected.\"\n"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Scan the diff for credentials
+        run: "set -eu\n# Include workflow changes: CI definitions can contain live credentials.\n\
+          diff=\"$(git diff origin/${{ github.base_ref }}...HEAD -- . || true)\"\n\n\
+          # Suppress only the repository's exact non-production smoke-test\n# placeholder,\
+          \ never arbitrary values named SESSION_ACCESS_TOKEN_SECRET.\ndiff=\"$(printf\
+          \ '%s\\n' \"$diff\" | sed 's/ci-smoke-test-secret-at-least-32-characters/CI_TEST/g')\"\
+          \n\n# Deliberately narrow. A scanner that fires on every base64 string\n#\
+          \ gets ignored within a week, and an ignored scanner is worse than\n# none\
+          \ because it produces the feeling of coverage.\nif printf '%s' \"$diff\" |\
+          \ grep -nE '^\\+.*([A-Z_]*(SECRET|TOKEN|API_KEY|PRIVATE_KEY)[A-Z_]*|-----BEGIN\
+          \ [A-Z ]*PRIVATE KEY-----)[^A-Z_]*[=:][[:space:]]*[\"'\"'\"'][^\"'\"'\"']{16,}'\
+          \ ; then\n  echo \"::error::What looks like a real secret is being committed.\"\
+          \n  echo \"Use an environment variable and document it in .env.example.\"\n\
+          \  exit 1\nfi\n\n# Stellar secret keys have a distinctive shape: S + 55 base32\
+          \ chars.\nif printf '%s' \"$diff\" | grep -nE '^\\+.*\\bS[A-Z2-7]{55}\\b';\
+          \ then\n  echo \"::error::That looks like a Stellar secret key.\"\n  echo\
+          \ \"Never commit one, even for testnet — throwaway keys get reused.\"\n  exit\
+          \ 1\nfi\n\necho \"No secrets detected.\"\n"
   reviewability:
     timeout-minutes: 15
     name: Pull request shape
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        fetch-depth: 0
-    - name: Assess size and scope
-      id: assess
-      run: "set -eu\nbase=\"origin/${{ github.base_ref }}\"\nfiles=\"$(git diff --name-only\
-        \ \"$base\"...HEAD | wc -l | tr -d ' ')\"\n# Lockfiles and generated output\
-        \ dominate the count without costing\n# review effort, so they are excluded\
-        \ from the signal.\nadded=\"$(git diff --numstat \"$base\"...HEAD \\\n  --\
-        \ . ':(exclude)pnpm-lock.yaml' ':(exclude)**/dist/**' \\\n  | awk '{ sum +=\
-        \ $1 } END { print sum + 0 }')\"\npackages=\"$(git diff --name-only \"$base\"\
-        ...HEAD \\\n  | grep -oE '^(packages/[a-z-]+|apps/[a-z-]+)' | sort -u | wc\
-        \ -l | tr -d ' ')\"\n\necho \"files=$files\"    >> \"$GITHUB_OUTPUT\"\necho\
-        \ \"added=$added\"    >> \"$GITHUB_OUTPUT\"\necho \"packages=$packages\" >>\
-        \ \"$GITHUB_OUTPUT\"\n\necho \"Files changed: $files\"\necho \"Lines added\
-        \ (excluding lockfile and dist): $added\"\necho \"Packages touched: $packages\"\
-        \n"
-    - name: Check the description explains why
-      id: description
-      env:
-        BODY: ${{ github.event.pull_request.body }}
-      run: 'set -eu
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Assess size and scope
+        id: assess
+        run: "set -eu\nbase=\"origin/${{ github.base_ref }}\"\nfiles=\"$(git diff --name-only\
+          \ \"$base\"...HEAD | wc -l | tr -d ' ')\"\n# Lockfiles and generated output\
+          \ dominate the count without costing\n# review effort, so they are excluded\
+          \ from the signal.\nadded=\"$(git diff --numstat \"$base\"...HEAD \\\n  --\
+          \ . ':(exclude)pnpm-lock.yaml' ':(exclude)**/dist/**' \\\n  | awk '{ sum +=\
+          \ $1 } END { print sum + 0 }')\"\npackages=\"$(git diff --name-only \"$base\"\
+          ...HEAD \\\n  | grep -oE '^(packages/[a-z-]+|apps/[a-z-]+)' | sort -u | wc\
+          \ -l | tr -d ' ')\"\n\necho \"files=$files\"    >> \"$GITHUB_OUTPUT\"\necho\
+          \ \"added=$added\"    >> \"$GITHUB_OUTPUT\"\necho \"packages=$packages\" >>\
+          \ \"$GITHUB_OUTPUT\"\n\necho \"Files changed: $files\"\necho \"Lines added\
+          \ (excluding lockfile and dist): $added\"\necho \"Packages touched: $packages\"\
+          \n"
+      - name: Check the description explains why
+        id: description
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: 'set -eu
 
-        words="$(printf ''%s'' "$BODY" | wc -w | tr -d '' '')"
+          words="$(printf ''%s'' "$BODY" | wc -w | tr -d '' '')"
 
-        echo "words=$words" >> "$GITHUB_OUTPUT"
+          echo "words=$words" >> "$GITHUB_OUTPUT"
 
-        echo "Description length: $words words"
+          echo "Description length: $words words"
 
-        '
-    - name: Comment when the shape makes review hard
-      if: steps.assess.outputs.added > 600 || steps.assess.outputs.packages > 2 ||
-        steps.description.outputs.words < 15
-      continue-on-error: true
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
-      with:
-        script: "const added = Number('${{ steps.assess.outputs.added }}');\nconst\
-          \ packages = Number('${{ steps.assess.outputs.packages }}');\nconst words\
-          \ = Number('${{ steps.description.outputs.words }}');\n\nconst notes = [];\n\
-          if (added > 600) {\n  notes.push(\n    `**This is a large change** — ${added}\
-          \ lines added. Large pull ` +\n    `requests get reviewed slowly, not because\
-          \ anyone is unwilling ` +\n    `but because finding the important part takes\
-          \ an afternoon. If ` +\n    `it splits cleanly along the roadmap issues,\
-          \ several small PRs ` +\n    `will merge faster than one big one. If it\
-          \ genuinely does not ` +\n    `split, say so and we will work through it.`\n\
-          \  );\n}\nif (packages > 2) {\n  notes.push(\n    `**This touches ${packages}\
-          \ packages.** That is sometimes ` +\n    `correct — a port and its adapter\
-          \ live in different places — ` +\n    `but it is also how unrelated work\
-          \ ends up bundled together. ` +\n    `Worth a sentence in the description\
-          \ saying why each one had ` +\n    `to change.`\n  );\n}\nif (words < 15)\
-          \ {\n  notes.push(\n    `**The description is very short.** A reviewer can\
-          \ read the ` +\n    `diff; what they cannot read is *why* you made a particular\
-          \ ` +\n    `choice, or what you tried first. Even two sentences on the `\
-          \ +\n    `reasoning makes a review faster and the merged history more `\
-          \ +\n    `useful to whoever reads it in a year.`\n  );\n}\n\nconst body\
-          \ = [\n  `### A few notes on reviewability`,\n  ``,\n  `These are **advisory**\
-          \ — nothing here blocks the merge, and none ` +\n  `of it means the code\
-          \ is wrong.`,\n  ``,\n  ...notes.map((n) => `- ${n}`),\n  ``,\n  `---`,\n\
-          \  `<sub>Automated. Disagree? Say so on the PR — these heuristics are `\
-          \ +\n  `wrong often enough that pushing back is expected.</sub>`,\n].join('\\\
-          n');\n\nconst marker = '### A few notes on reviewability';\nconst existing\
-          \ = await github.rest.issues.listComments({\n  owner: context.repo.owner,\n\
-          \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n});\n\
-          const previous = existing.data.find(\n  (c) => c.user.type === 'Bot' &&\
-          \ c.body.includes(marker)\n);\n\n// Updated in place rather than appended,\
-          \ so a contributor who\n// pushes six times does not accumulate six identical\
-          \ comments.\nif (previous) {\n  await github.rest.issues.updateComment({\n\
-          \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    comment_id:\
-          \ previous.id,\n    body,\n  });\n} else {\n  await github.rest.issues.createComment({\n\
-          \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    issue_number:\
-          \ context.issue.number,\n    body,\n  });\n}\n"
+          '
+      - name: Comment when the shape makes review hard
+        if: steps.assess.outputs.added > 600 || steps.assess.outputs.packages > 2 ||
+          steps.description.outputs.words < 15
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: "const added = Number('${{ steps.assess.outputs.added }}');\nconst\
+            \ packages = Number('${{ steps.assess.outputs.packages }}');\nconst words\
+            \ = Number('${{ steps.description.outputs.words }}');\n\nconst notes = [];\n\
+            if (added > 600) {\n  notes.push(\n    `**This is a large change** — ${added}\
+            \ lines added. Large pull ` +\n    `requests get reviewed slowly, not because\
+            \ anyone is unwilling ` +\n    `but because finding the important part takes\
+            \ an afternoon. If ` +\n    `it splits cleanly along the roadmap issues,\
+            \ several small PRs ` +\n    `will merge faster than one big one. If it\
+            \ genuinely does not ` +\n    `split, say so and we will work through it.`\n\
+            \  );\n}\nif (packages > 2) {\n  notes.push(\n    `**This touches ${packages}\
+            \ packages.** That is sometimes ` +\n    `correct — a port and its adapter\
+            \ live in different places — ` +\n    `but it is also how unrelated work\
+            \ ends up bundled together. ` +\n    `Worth a sentence in the description\
+            \ saying why each one had ` +\n    `to change.`\n  );\n}\nif (words < 15)\
+            \ {\n  notes.push(\n    `**The description is very short.** A reviewer can\
+            \ read the ` +\n    `diff; what they cannot read is *why* you made a particular\
+            \ ` +\n    `choice, or what you tried first. Even two sentences on the `\
+            \ +\n    `reasoning makes a review faster and the merged history more `\
+            \ +\n    `useful to whoever reads it in a year.`\n  );\n}\n\nconst body\
+            \ = [\n  `### A few notes on reviewability`,\n  ``,\n  `These are **advisory**\
+            \ — nothing here blocks the merge, and none ` +\n  `of it means the code\
+            \ is wrong.`,\n  ``,\n  ...notes.map((n) => `- ${n}`),\n  ``,\n  `---`,\n\
+            \  `<sub>Automated. Disagree? Say so on the PR — these heuristics are `\
+            \ +\n  `wrong often enough that pushing back is expected.</sub>`,\n].join('\\\
+            n');\n\nconst marker = '### A few notes on reviewability';\nconst existing\
+            \ = await github.rest.issues.listComments({\n  owner: context.repo.owner,\n\
+            \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n});\n\
+            const previous = existing.data.find(\n  (c) => c.user.type === 'Bot' &&\
+            \ c.body.includes(marker)\n);\n\n// Updated in place rather than appended,\
+            \ so a contributor who\n// pushes six times does not accumulate six identical\
+            \ comments.\nif (previous) {\n  await github.rest.issues.updateComment({\n\
+            \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    comment_id:\
+            \ previous.id,\n    body,\n  });\n} else {\n  await github.rest.issues.createComment({\n\
+            \    owner: context.repo.owner,\n    repo: context.repo.repo,\n    issue_number:\
+            \ context.issue.number,\n    body,\n  });\n}\n"
   env-example:
     name: No duplicate keys in .env.example
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v7
-      with:
-        fetch-depth: 1
-    - name: Fail on duplicated keys
-      run: "set -eu\ndupes=\"$(grep -oE '^[A-Z][A-Z0-9_]*=' .env.example | sort |\
-        \ uniq -d || true)\"\nif [ -n \"$dupes\" ]; then\n  echo \"::error::Duplicate\
-        \ keys in .env.example: $(echo \"$dupes\" | tr '\\n' ' ')\"\n  echo \"A dotenv\
-        \ loader takes the last assignment — keep exactly one entry per key.\"\n \
-        \ exit 1\nfi\necho \"No duplicate keys in .env.example.\"\n"
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Fail on duplicated keys
+        run: "set -eu\ndupes=\"$(grep -oE '^[A-Z][A-Z0-9_]*=' .env.example | sort |\
+          \ uniq -d || true)\"\nif [ -n \"$dupes\" ]; then\n  echo \"::error::Duplicate\
+          \ keys in .env.example: $(echo \"$dupes\" | tr '\\n' ' ')\"\n  echo \"A dotenv\
+          \ loader takes the last assignment — keep exactly one entry per key.\"\n \
+          \ exit 1\nfi\necho \"No duplicate keys in .env.example.\"\n"
   test-coverage:
     timeout-minutes: 20
     name: New code has tests
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        fetch-depth: 0
-    - name: Compare source and test changes
-      run: "set -eu\nbase=\"origin/${{ github.base_ref }}\"\n\nsrc=\"$(git diff --name-only\
-        \ \"$base\"...HEAD \\\n  | grep -E '^(packages|apps)/.*\\.ts$' \\\n  | grep\
-        \ -v '\\.spec\\.ts$' \\\n  | grep -v '/testing/' || true)\"\ntests=\"$(git\
-        \ diff --name-only \"$base\"...HEAD | grep -E '\\.spec\\.ts$' || true)\"\n\
-        \nif [ -z \"$src\" ]; then\n  echo \"No source changes — nothing to check.\"\
-        \n  exit 0\nfi\n\nif [ -n \"$tests\" ]; then\n  echo \"Source and tests both\
-        \ changed.\"\n  exit 0\nfi\n\necho \"::warning::Source files changed but no\
-        \ test file did.\"\necho \"\"\necho \"Changed without accompanying tests:\"\
-        \necho \"$src\"\necho \"\"\necho \"This is a warning, not a failure — a pure\
-        \ refactor or a docs-only\"\necho \"type change legitimately needs no new\
-        \ test. But if this adds or\"\necho \"changes behaviour, it needs a test that\
-        \ would fail without it.\"\necho \"\"\necho \"Not sure where it goes? Unit\
-        \ tests sit next to the code they\"\necho \"cover; anything needing a database\
-        \ lives in tests/integration/.\"\n"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Compare source and test changes
+        run: "set -eu\nbase=\"origin/${{ github.base_ref }}\"\n\nsrc=\"$(git diff --name-only\
+          \ \"$base\"...HEAD \\\n  | grep -E '^(packages|apps)/.*\\.ts$' \\\n  | grep\
+          \ -v '\\.spec\\.ts$' \\\n  | grep -v '/testing/' || true)\"\ntests=\"$(git\
+          \ diff --name-only \"$base\"...HEAD | grep -E '\\.spec\\.ts$' || true)\"\n\
+          \nif [ -z \"$src\" ]; then\n  echo \"No source changes — nothing to check.\"\
+          \n  exit 0\nfi\n\nif [ -n \"$tests\" ]; then\n  echo \"Source and tests both\
+          \ changed.\"\n  exit 0\nfi\n\necho \"::warning::Source files changed but no\
+          \ test file did.\"\necho \"\"\necho \"Changed without accompanying tests:\"\
+          \necho \"$src\"\necho \"\"\necho \"This is a warning, not a failure — a pure\
+          \ refactor or a docs-only\"\necho \"type change legitimately needs no new\
+          \ test. But if this adds or\"\necho \"changes behaviour, it needs a test that\
+          \ would fail without it.\"\necho \"\"\necho \"Not sure where it goes? Unit\
+          \ tests sit next to the code they\"\necho \"cover; anything needing a database\
+          \ lives in tests/integration/.\"\n"
   dependencies:
     timeout-minutes: 20
     name: Dependency review
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        fetch-depth: 0
-    - name: Detect lockfile changes
-      id: lock
-      run: "set -eu\nif git diff --name-only origin/${{ github.base_ref }}...HEAD\
-        \ | grep -q 'pnpm-lock.yaml'; then\n  echo \"changed=true\" >> \"$GITHUB_OUTPUT\"\
-        \nelse\n  echo \"changed=false\" >> \"$GITHUB_OUTPUT\"\nfi\n"
-    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
-      if: steps.lock.outputs.changed == 'true'
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-      if: steps.lock.outputs.changed == 'true'
-      with:
-        node-version: 22
-        cache: pnpm
-    - name: Audit for known vulnerabilities
-      if: steps.lock.outputs.changed == 'true'
-      run: "set -eu\npnpm install --frozen-lockfile\n# High and critical only. A build\
-        \ that fails on every low-severity\n# advisory in a transitive dev dependency\
-        \ gets bypassed habitually,\n# and a bypassed gate protects nothing.\nif !\
-        \ pnpm audit --audit-level high; then\n  echo \"::error::A high or critical\
-        \ severity advisory affects this dependency change.\"\n  echo \"Options, roughly\
-        \ in order of preference: upgrade the dependency,\"\n  echo \"remove it, or\
-        \ add a pinned override in pnpm-workspace.yaml with a\"\n  echo \"comment\
-        \ explaining the decision — there are existing examples there.\"\n  exit 1\n\
-        fi\n"
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        fetch-depth: 0
-    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
-      if: steps.lock.outputs.changed == 'true'
-    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-      if: steps.lock.outputs.changed == 'true'
-      with:
-        node-version: 22
-        cache: pnpm
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - name: Detect lockfile changes
+        id: lock
+        run: "set -eu\nif git diff --name-only origin/${{ github.base_ref }}...HEAD\
+          \ | grep -q 'pnpm-lock.yaml'; then\n  echo \"changed=true\" >> \"$GITHUB_OUTPUT\"\
+          \nelse\n  echo \"changed=false\" >> \"$GITHUB_OUTPUT\"\nfi\n"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        if: steps.lock.outputs.changed == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: steps.lock.outputs.changed == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Audit for known vulnerabilities
+        if: steps.lock.outputs.changed == 'true'
+        run: "set -eu\npnpm install --frozen-lockfile\n# High and critical only. A build\
+          \ that fails on every low-severity\n# advisory in a transitive dev dependency\
+          \ gets bypassed habitually,\n# and a bypassed gate protects nothing.\nif !\
+          \ pnpm audit --audit-level high; then\n  echo \"::error::A high or critical\
+          \ severity advisory affects this dependency change.\"\n  echo \"Options, roughly\
+          \ in order of preference: upgrade the dependency,\"\n  echo \"remove it, or\
+          \ add a pinned override in pnpm-workspace.yaml with a\"\n  echo \"comment\
+          \ explaining the decision — there are existing examples there.\"\n  exit 1\n\
+          fi\n"
   welcome:
     timeout-minutes: 10
     name: First-time contributor
     runs-on: ubuntu-latest
     if: github.event.action == 'opened'
     steps:
-    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
-      with:
-        script: "const { data: pulls } = await github.rest.pulls.list({\n  owner:\
-          \ context.repo.owner,\n  repo: context.repo.repo,\n  state: 'all',\n  per_page:\
-          \ 100,\n});\nconst author = context.payload.pull_request.user.login;\nconst\
-          \ theirs = pulls.filter((p) => p.user.login === author);\nif (theirs.length\
-          \ > 1) return;\n\nawait github.rest.issues.createComment({\n  owner: context.repo.owner,\n\
-          \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n  body:\
-          \ [\n    `Thanks for your first pull request to Verixa.`,\n    ``,\n   \
-          \ `A few things worth knowing, so nothing here surprises you:`,\n    ``,\n\
-          \    `- **Some checks are advisory.** Only architecture boundaries and`,\n\
-          \    `  secret detection block a merge. Everything else leaves a comment`,\n\
-          \    `  you are free to disagree with.`,\n    `- **CI failures are normal**,\
-          \ especially the commit-message format`,\n    `  and the layering rule.\
-          \ Neither means the work is wrong.`,\n    `- **Ask on the PR.** Questions\
-          \ are not a sign you should not be`,\n    `  working on this. The parts\
-          \ of this codebase that are subtle are`,\n    `  subtle for everyone.`,\n\
-          \    ``,\n    `If anything in the issue you picked up was unclear or wrong,\
-          \ saying`,\n    `so is a genuinely useful contribution by itself.`,\n  ].join('\\\
-          n'),\n});\n"
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: "const { data: pulls } = await github.rest.pulls.list({\n  owner:\
+            \ context.repo.owner,\n  repo: context.repo.repo,\n  state: 'all',\n  per_page:\
+            \ 100,\n});\nconst author = context.payload.pull_request.user.login;\nconst\
+            \ theirs = pulls.filter((p) => p.user.login === author);\nif (theirs.length\
+            \ > 1) return;\n\nawait github.rest.issues.createComment({\n  owner: context.repo.owner,\n\
+            \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n  body:\
+            \ [\n    `Thanks for your first pull request to Verixa.`,\n    ``,\n   \
+            \ `A few things worth knowing, so nothing here surprises you:`,\n    ``,\n\
+            \    `- **Some checks are advisory.** Only architecture boundaries and`,\n\
+            \    `  secret detection block a merge. Everything else leaves a comment`,\n\
+            \    `  you are free to disagree with.`,\n    `- **CI failures are normal**,\
+            \ especially the commit-message format`,\n    `  and the layering rule.\
+            \ Neither means the work is wrong.`,\n    `- **Ask on the PR.** Questions\
+            \ are not a sign you should not be`,\n    `  working on this. The parts\
+            \ of this codebase that are subtle are`,\n    `  subtle for everyone.`,\n\
+            \    ``,\n    `If anything in the issue you picked up was unclear or wrong,\
+            \ saying`,\n    `so is a genuinely useful contribution by itself.`,\n  ].join('\\\
+            n'),\n});\n"

@@ -8,7 +8,7 @@ import { WebAuthnCredential } from "../../../domain/entities/webauthn-credential
 function makeCredential(
   userId = createId<"UserId">(),
   mfaMethodId = createId<"MfaMethodId">(),
-  credentialId = "cred-abc",
+  credentialId = "cred-" + createId<"WebAuthnCredentialId">(),
 ): WebAuthnCredential {
   return WebAuthnCredential.create({
     userId,
@@ -61,15 +61,17 @@ export function webAuthnCredentialRepositoryContract(
       const repo = createRepository();
       const ctx1 = await setupContext();
       const ctx2 = await setupContext(ctx1.userId);
-      const cred1 = makeCredential(ctx1.userId, ctx1.mfaMethodId, "cred-1");
-      const cred2 = makeCredential(ctx1.userId, ctx2.mfaMethodId, "cred-2");
+      const c1Id = "cred-1-" + createId<"WebAuthnCredentialId">();
+      const c2Id = "cred-2-" + createId<"WebAuthnCredentialId">();
+      const cred1 = makeCredential(ctx1.userId, ctx1.mfaMethodId, c1Id);
+      const cred2 = makeCredential(ctx1.userId, ctx2.mfaMethodId, c2Id);
 
       await repo.save(cred1);
       await repo.save(cred2);
 
       const list = await repo.findByUserId(ctx1.userId);
       expect(list.length).toBe(2);
-      expect(list.map((c) => c.credentialId).sort()).toEqual(["cred-1", "cred-2"]);
+      expect(list.map((c) => c.credentialId).sort()).toEqual([c1Id, c2Id].sort());
     });
 
     it("supports upsert / idempotent save", async () => {

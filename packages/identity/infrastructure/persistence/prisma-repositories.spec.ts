@@ -65,6 +65,8 @@ describe.skipIf(database === undefined)("Prisma repositories (real Postgres)", (
     // fakes get that free from a new Map per factory call, so the Prisma
     // implementation has to provide it explicitly. Order matters:
     // `organizations.owner_id` is ON DELETE RESTRICT, so users go last.
+    await db.prisma.userRoleAssignment.deleteMany({});
+    await db.prisma.verificationRequest.deleteMany({});
     await db.prisma.invitation.deleteMany({});
     await db.prisma.organizationMembership.deleteMany({});
     await db.prisma.organization.deleteMany({});

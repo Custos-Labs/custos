@@ -20,15 +20,16 @@
     "benchmark:audit": "tsx scripts/benchmark-audit-queries.ts",
     "db:validate": "prisma validate",
     "db:format:check": "prisma format --check",
+    "db:format": "prisma format",
     "db:drift": "prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --shadow-database-url $SHADOW_DATABASE_URL --exit-code"
   },
   "dependencies": {
-    "@prisma/client": "^7.10.0"
+    "@prisma/client": "^6.2.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@vitest/coverage-v8": "^5.0.3",
-    "prisma": "^7.10.0",
+    "prisma": "^6.2.1",
     "tsx": "^4.23.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

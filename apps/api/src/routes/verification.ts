@@ -1,4 +1,4 @@
-import { AuthorizationError, ValidationError } from "@verixa/shared-kernel";
+import { AuthorizationError } from "@verixa/shared-kernel";
 import type {
   FastifyBaseLogger,
   FastifyInstance,
@@ -212,11 +212,6 @@ export function registerVerificationRoutes<TLogger extends FastifyBaseLogger>(
           message: "File size exceeds limit",
         },
       });
-    const size = data?.file ? await getStreamSize(data.file) : 1024;
-
-    if (size > 10 * 1024 * 1024) {
-      sendError(reply, new ValidationError("File size exceeds limit"));
-      return;
     }
 
     return reply.status(201).send({

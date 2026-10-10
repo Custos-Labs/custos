@@ -1,9 +1,6 @@
 import type { User } from "@verixa/identity";
 import {
   AuthenticationError,
-  Result,
-  ValidationError,
-  type Id,
   RateLimitExceededError,
   Result,
   ValidationError,
@@ -59,7 +56,6 @@ export class ChangePassword {
   async execute(
     command: ChangePasswordCommand,
   ): Promise<Result<ChangePasswordResult, ChangePasswordError>> {
-  ): Promise<Result<ChangePasswordResult, ValidationError>> {
     // 1. Check rate limit BEFORE any other logic
     const rateLimitKey: RateLimitKey = {
       action: "password-change",
@@ -121,13 +117,9 @@ export class ChangePassword {
     if (outcome.kind === "wrong_current_password") {
       // Wrong re-authentication is treated as authentication failure: same
       // message, same timing (password verification is expensive and took
-      // time already).
-      return Result.err(new AuthenticationError());
       // time already). Record failure so repeated guessing is rate limited.
       await this.rateLimiter.recordFailure(rateLimitKey);
-      return Result.err(
-        new ValidationError("Current password is incorrect.", { currentPassword: ["incorrect"] }),
-      );
+      return Result.err(new AuthenticationError());
     }
 
     if (outcome.kind === "password_reused") {

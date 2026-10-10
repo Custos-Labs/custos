@@ -106,6 +106,9 @@ describe.skipIf(database === undefined)("PrismaMfaMethodRepository (real Postgre
 
       const method2 = MfaMethod.createPendingTotp(userId, { value: "SECRET2" }).activate();
       await expect(repository.save(method2)).rejects.toThrow();
+    });
+  });
+
   describe("lockout and replay state persistence (Issue 100)", () => {
     it("a failed attempt survives a fresh repository read", async () => {
       const repo = new PrismaMfaMethodRepository(prisma);
