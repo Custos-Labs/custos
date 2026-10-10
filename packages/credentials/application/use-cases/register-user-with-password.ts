@@ -97,33 +97,49 @@ export class RegisterUserWithPassword {
     // thing the request does, and it needs no database.
     const passwordHash = await this.passwordHasher.hash(passwordResult.value.reveal());
 
-    const result = await this.unitOfWork.run(async (repositories) => {
-      // Re-checked inside the transaction rather than before it. Checking
-      // outside would leave a window where two concurrent registrations for
-      // the same address both see "available" and both proceed — the second
-      // then failing on the unique index as an unhandled constraint error
-      // rather than a clean conflict. The index is still the real guarantee;
-      // this turns the common case into a typed error.
-      const alreadyRegistered = await repositories.users.existsByEmail(emailResult.value);
-      if (alreadyRegistered) {
+    let result: Result<RegisterUserWithPasswordResult, RegisterUserWithPasswordError>;
+    try {
+      result = await this.unitOfWork.run(async (repositories) => {
+        // Re-checked inside the transaction rather than before it. Checking
+        // outside would leave a window where two concurrent registrations for
+        // the same address both see "available" and both proceed — the second
+        // then failing on the unique index as an unhandled constraint error
+        // rather than a clean conflict. The index is still the real guarantee;
+        // this turns the common case into a typed error.
+        const alreadyRegistered = await repositories.users.existsByEmail(emailResult.value);
+        if (alreadyRegistered) {
+          return Result.err(
+            new ConflictError(`A user with email "${emailResult.value.value}" already exists.`),
+          );
+        }
+
+        const user = User.register({
+          email: emailResult.value,
+          displayName: displayNameResult.value,
+          personName,
+        });
+
+        const credential = Credential.create({ userId: user.id, passwordHash });
+
+        await repositories.users.save(user);
+        await repositories.credentials.save(credential);
+
+        return Result.ok({ user, credential });
+      });
+    } catch (error) {
+      if (error instanceof ConflictError) {
+        // Lost the race: both registrations passed the pre-flight check and
+        // the unique index caught the loser on the write. The persistence
+        // boundary already translated the violation into a ConflictError;
+        // return it as the typed error the pre-flight path returns — same
+        // error, same message — instead of letting it escape as an
+        // exception this signature does not admit.
         return Result.err(
           new ConflictError(`A user with email "${emailResult.value.value}" already exists.`),
         );
       }
-
-      const user = User.register({
-        email: emailResult.value,
-        displayName: displayNameResult.value,
-        personName,
-      });
-
-      const credential = Credential.create({ userId: user.id, passwordHash });
-
-      await repositories.users.save(user);
-      await repositories.credentials.save(credential);
-
-      return Result.ok({ user, credential });
-    });
+      throw error;
+    }
 
     // Reset rate limit counter on successful registration
     if (Result.isOk(result)) {
