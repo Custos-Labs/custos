@@ -8,6 +8,8 @@ import {
   SessionCreatedAuditSubscriber,
   type SessionRevokedEvent,
   SessionRevokedAuditSubscriber,
+  WebAuthnCloneSuspectedAuditSubscriber,
+  type WebAuthnCloneSuspectedEvent,
 } from "@verixa/audit";
 import type { DomainEventPublisher } from "@verixa/shared-kernel";
 
@@ -58,6 +60,7 @@ export function registerAuditSubscribers(
   const sessionRevoked = new SessionRevokedAuditSubscriber(recordEvent);
   const roleAssigned = new RoleAssignedAuditSubscriber(recordEvent);
   const permissionGranted = new PermissionGrantedAuditSubscriber(recordEvent);
+  const cloneSuspected = new WebAuthnCloneSuspectedAuditSubscriber(recordEvent);
 
   publisher.subscribe<SessionCreatedEvent>("sessions.session.created", (event) =>
     sessionCreated.handle(event),
@@ -70,5 +73,8 @@ export function registerAuditSubscribers(
   );
   publisher.subscribe<PermissionGrantedEvent>("rbac.permission.granted", (event) =>
     permissionGranted.handle(event),
+  );
+  publisher.subscribe<WebAuthnCloneSuspectedEvent>("mfa.webauthn.clone_suspected", (event) =>
+    cloneSuspected.handle(event),
   );
 }

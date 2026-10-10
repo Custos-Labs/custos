@@ -37,7 +37,6 @@ import {
   UpdateUserProfile,
 } from "@verixa/identity";
 import {
-  InMemoryDomainEventPublisher,
   InMemoryMfaMethodRepository,
   InMemoryWebAuthnChallengeRepository,
   InMemoryWebAuthnCredentialRepository,
@@ -391,7 +390,6 @@ export function buildContainer(
   const mfaMethodRepo = new InMemoryMfaMethodRepository();
   const webAuthnCredentialRepo = new InMemoryWebAuthnCredentialRepository();
   const webAuthnChallengeRepo = new InMemoryWebAuthnChallengeRepository();
-  const mfaEventPublisher = new InMemoryDomainEventPublisher();
   const attestationVerifier = new WebAuthnAttestationVerifier();
   const assertionVerifier = new WebAuthnAssertionVerifier();
 
@@ -411,7 +409,7 @@ export function buildContainer(
     webAuthnCredentialRepo,
     webAuthnChallengeRepo,
     assertionVerifier,
-    mfaEventPublisher,
+    eventPublisher,
     {
       expectedOrigin: webauthnOrigin,
       expectedRpId: webauthnRpId,

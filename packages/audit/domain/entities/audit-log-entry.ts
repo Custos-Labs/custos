@@ -42,7 +42,9 @@ export type AuditAction =
   // Reads of the audit log itself — see `domain/policies/audit-access-policy.ts`.
   | "audit.queried"
   | "audit.exported"
-  | "audit.access_denied";
+  | "audit.access_denied"
+  // MFA context
+  | "mfa.webauthn.clone_suspected";
 
 /**
  * The genesis link.

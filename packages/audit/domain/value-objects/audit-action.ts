@@ -64,7 +64,9 @@ export type AuditAction =
   | "audit.log.queried"
   | "audit.log.exported"
   | "audit.chain.verified"
-  | "audit.chain.anchored";
+  | "audit.chain.anchored"
+  // MFA context
+  | "mfa.webauthn.clone_suspected";
 
 /**
  * Type guard for valid audit actions.
@@ -102,6 +104,7 @@ export function isAuditAction(value: string): value is AuditAction {
     "audit.log.exported",
     "audit.chain.verified",
     "audit.chain.anchored",
+    "mfa.webauthn.clone_suspected",
   ];
 
   return validActions.includes(value);

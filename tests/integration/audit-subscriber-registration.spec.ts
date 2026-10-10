@@ -4,6 +4,7 @@ import {
   type RoleAssignedEvent,
   type SessionCreatedEvent,
   type SessionRevokedEvent,
+  type WebAuthnCloneSuspectedEvent,
 } from "@verixa/audit";
 import { Result } from "@verixa/shared-kernel";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -99,6 +100,18 @@ function permissionGranted(actorId: string, userId: string): PermissionGrantedEv
   };
 }
 
+function cloneSuspected(userId: string): WebAuthnCloneSuspectedEvent {
+  return {
+    eventName: "mfa.webauthn.clone_suspected",
+    aggregateId: "credential-1",
+    occurredAt,
+    credentialId: "credential-1",
+    userId,
+    previousCounter: 41,
+    presentedCounter: 41,
+  };
+}
+
 describe.skipIf(!available)("audit subscribers at composition", () => {
   const prisma = createTestPrismaClient();
   let container: Container;
@@ -168,11 +181,28 @@ describe.skipIf(!available)("audit subscribers at composition", () => {
   describe("registered subscribers", () => {
     /** Publishes an event and returns the entries the log gained from it. */
     async function publishAndRead(
-      event: SessionCreatedEvent | SessionRevokedEvent | RoleAssignedEvent | PermissionGrantedEvent,
+      event:
+        | SessionCreatedEvent
+        | SessionRevokedEvent
+        | RoleAssignedEvent
+        | PermissionGrantedEvent
+        | WebAuthnCloneSuspectedEvent,
     ) {
       await container.eventPublisher.publish(event);
       return prisma.auditLogEntry.findMany({ orderBy: { sequence: "desc" } });
     }
+
+    it("records a suspected WebAuthn clone with both counters", async () => {
+      const entries = await publishAndRead(cloneSuspected("11111111-1111-4111-8111-111111111111"));
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.action).toBe("mfa.webauthn.clone_suspected");
+      expect(entries[0]?.metadata).toMatchObject({
+        credentialId: "credential-1",
+        previousCounter: "41",
+        presentedCounter: "41",
+      });
+    });
 
     it("records a session creation without any caller asking it to", async () => {
       const entries = await publishAndRead(sessionCreated("11111111-1111-4111-8111-111111111111"));
