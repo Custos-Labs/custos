@@ -94,21 +94,21 @@ importers:
         specifier: ^5.4.1
         version: 5.11.1(supports-color@7.2.0)
       zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.4
       '@types/supertest':
-        specifier: ^6.0.2
-        version: 6.0.3
+        specifier: ^7.2.1
+        version: 7.2.1
       '@vitest/coverage-v8':
         specifier: ^3.2.6
         version: 3.2.7(supports-color@7.2.0)(vitest@3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.1))
       supertest:
-        specifier: ^7.0.0
-        version: 7.3.0(supports-color@7.2.0)
+        specifier: ^7.3.1
+        version: 7.3.1(supports-color@7.2.0)
       tsx:
         specifier: ^4.19.2
         version: 4.23.15
@@ -128,8 +128,8 @@ importers:
         specifier: workspace:*
         version: link:../shared-kernel
       zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@stellar/stellar-sdk':
         specifier: ^16.2.0
@@ -169,8 +169,8 @@ importers:
         specifier: ^22.10.0
         version: 22.20.4
       '@types/supertest':
-        specifier: ^6.0.2
-        version: 6.0.3
+        specifier: ^7.2.1
+        version: 7.2.1
       '@verixa/database':
         specifier: workspace:*
         version: link:../database
@@ -184,8 +184,8 @@ importers:
         specifier: ^5.11.1
         version: 5.11.1(supports-color@7.2.0)
       supertest:
-        specifier: ^7.0.0
-        version: 7.3.0(supports-color@7.2.0)
+        specifier: ^7.3.1
+        version: 7.3.1(supports-color@7.2.0)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -196,8 +196,8 @@ importers:
   packages/config:
     dependencies:
       zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+        specifier: ^4.6.5
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -433,8 +433,8 @@ importers:
         specifier: ^22.10.0
         version: 22.20.4
       '@types/supertest':
-        specifier: ^6.0.2
-        version: 6.0.3
+        specifier: ^7.2.1
+        version: 7.2.1
       '@verixa/api':
         specifier: workspace:*
         version: link:../apps/api
@@ -457,8 +457,8 @@ importers:
         specifier: ^3.2.6
         version: 3.2.7(supports-color@7.2.0)(vitest@3.2.7(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.1))
       supertest:
-        specifier: ^7.0.0
-        version: 7.3.0(supports-color@7.2.0)
+        specifier: ^7.3.1
+        version: 7.3.1(supports-color@7.2.0)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -1410,8 +1410,8 @@ packages:
   '@types/superagent@8.1.11':
     resolution: {integrity: sha512-KA7srSW/HENDtOw9DOqaFLgWuMqN9WgjEw62lh9dpvRaZDkhdOkazASd7X7i2eMUYLHa1U37ZttnePsH5zTDHw==}
 
-  '@types/supertest@6.0.3':
-    resolution: {integrity: sha512-8WzXq62EXFhJ7QsH3Ocb/iKQ/Ty9ZVWnVzoTKc9tyyFRRF3a74Tk2+TLFgaFFw364Ere+npzHKEJ6ga2LzIL7w==}
+  '@types/supertest@7.2.1':
+    resolution: {integrity: sha512-4CbBvoYVLHL7+yhbYrZET0vsvuyXTC05aRe7dNQkwMzm56auceoy6Yu3K50uZmwfHna1os3CMSgM/3QVkUtPTw==}
 
   '@typescript-eslint/eslint-plugin@8.71.0':
     resolution: {integrity: sha512-pqcS9c1HxZTHt7End4nXqd0s5lJrrFzrgCkKFJrsbUnaL6M3+6oBFZaslg6Gjsl3argl2DDRFROnXARaZ2e4Nw==}
@@ -3137,8 +3137,8 @@ packages:
     resolution: {integrity: sha512-PVMkMrhKrSTtFhUU8jiWuGh/gyRMKiyCTCmm0+qVzRNxlfntmRKJkDhlEXN62x3HIb33sQ4kmL8lcSdccWAchQ==}
     engines: {node: '>=14.18.0'}
 
-  supertest@7.3.0:
-    resolution: {integrity: sha512-UwwmWq3xLhyU96c521wYNaBg7IqX78Wpj4FKs6Katp6vdklX42zU5ESvX3KeZRLFyO44RwFp4yvxYMNZzCcX9g==}
+  supertest@7.3.1:
+    resolution: {integrity: sha512-vNaNCFoCR/edDbErQZp5KLNT8R4dSPHX7rlDLoE8hWLAm/878j6ShMbe8HK/E6RwwuhlSXVelXAIg9AxR5WWPw==}
     engines: {node: '>=14.18.0'}
 
   supports-color@7.2.0:
@@ -3400,8 +3400,8 @@ packages:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
 
 snapshots:
 
@@ -4169,7 +4169,7 @@ snapshots:
       '@types/node': 22.20.4
       form-data: 4.0.6
 
-  '@types/supertest@6.0.3':
+  '@types/supertest@7.2.1':
     dependencies:
       '@types/methods': 1.1.4
       '@types/superagent': 8.1.11
@@ -5958,7 +5958,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  supertest@7.3.0(supports-color@7.2.0):
+  supertest@7.3.1(supports-color@7.2.0):
     dependencies:
       cookie-signature: 1.2.2
       methods: 1.1.2
@@ -6292,4 +6292,4 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.7.0
 
-  zod@3.25.76: {}
+  zod@4.6.5: {}
