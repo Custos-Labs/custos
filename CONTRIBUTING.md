@@ -9,6 +9,10 @@ typecheck, tests) that a solution is reviewed against. Drive-by pull requests
 outside the bounty issues are not reviewed at this stage — the architecture and
 foundational tooling are still being laid down.
 
+## Security
+
+Found a security issue? Do not open an issue or PR for it — report it privately per [`SECURITY.md`](SECURITY.md).
+
 ## Getting started
 
 See the [README quickstart](README.md#quickstart) for prerequisites and the

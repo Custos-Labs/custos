@@ -185,7 +185,7 @@ linter checks and why.
 - **Never commit secrets** — keep keys, seed phrases, and `.env` files out of source control.
 - **Testnet values have no real-world value**; treat testnet deployments as experimental.
 - **Keys never leave the wallet** — signing is delegated to the user's Stellar wallet; the app does not store secret keys.
-- Report vulnerabilities per `SECURITY.md` where present rather than opening a public issue.
+- Report vulnerabilities privately per [`SECURITY.md`](SECURITY.md) — never via a public issue.
 
 ## Contributing
 
