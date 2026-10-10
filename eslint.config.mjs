@@ -35,6 +35,7 @@ export default tseslint.config(
       "packages/mfa/infrastructure/persistence/prisma-webauthn-credential-repository.ts",
       "packages/mfa/infrastructure/persistence/prisma-webauthn-credential-repository.spec.ts",
       "packages/mfa/infrastructure/persistence/webauthn-credential-mapper.ts",
+      "packages/verification/**",
     ],
   },
   js.configs.recommended,
