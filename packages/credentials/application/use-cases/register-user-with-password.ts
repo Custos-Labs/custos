@@ -1,5 +1,11 @@
 import { DisplayName, Email, PersonName, User } from "@verixa/identity";
-import { ConflictError, NotFoundError, Result, ValidationError } from "@verixa/shared-kernel";
+import {
+  ConflictError,
+  NotFoundError,
+  RateLimitExceededError,
+  Result,
+  ValidationError,
+} from "@verixa/shared-kernel";
 import type { RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
 
 import { Credential } from "../../domain/entities/credential.js";
@@ -54,10 +60,7 @@ export class RegisterUserWithPassword {
 
     const limitResult = await this.rateLimiter.check(rateLimitKey);
     if (!limitResult.allowed) {
-      throw new Error(
-        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
-          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
-      );
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
     }
 
     // Every input is validated before the transaction opens, and before the

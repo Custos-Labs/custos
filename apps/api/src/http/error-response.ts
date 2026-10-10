@@ -1,4 +1,4 @@
-import { DomainError, ValidationError } from "@verixa/shared-kernel";
+import { DomainError, RateLimitExceededError, ValidationError } from "@verixa/shared-kernel";
 import type { FastifyReply } from "fastify";
 
 /**
@@ -16,6 +16,8 @@ export interface ErrorResponseBody {
     readonly message: string;
     /** Present only for validation failures: which field failed, and why. */
     readonly fields?: Readonly<Record<string, readonly string[]>>;
+    /** Present only for 429s: seconds until the client may retry. */
+    readonly retryAfter?: number;
   };
 }
 
@@ -32,6 +34,11 @@ export interface ErrorResponseBody {
  * {@link sendUnexpectedError}.
  */
 export function sendDomainError(reply: FastifyReply, error: DomainError): void {
+  const retryAfter =
+    error instanceof RateLimitExceededError
+      ? Math.max(0, Math.ceil((error.resetAt - Date.now()) / 1000))
+      : undefined;
+
   const body: ErrorResponseBody = {
     error: {
       code: error.code,
@@ -39,8 +46,13 @@ export function sendDomainError(reply: FastifyReply, error: DomainError): void {
       ...(error instanceof ValidationError && Object.keys(error.fieldErrors).length > 0
         ? { fields: error.fieldErrors }
         : {}),
+      ...(retryAfter !== undefined ? { retryAfter } : {}),
     },
   };
+
+  if (retryAfter !== undefined) {
+    void reply.header("Retry-After", String(retryAfter));
+  }
 
   void reply.status(error.httpStatusHint).send(body);
 }

@@ -1,5 +1,6 @@
 import { Result } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
+import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -113,5 +114,23 @@ describe("RegisterUserWithPassword", () => {
     if (!Result.isOk(result)) throw new Error("fixture setup failed");
 
     expect(result.value.user.pullDomainEvents()).toHaveLength(1);
+  });
+
+  it("throws RateLimitExceededError when rate limit is exceeded", async () => {
+    const resetAt = Date.now() + 60000;
+    const blockingLimiter = {
+      check: () => Promise.resolve({ allowed: false, remaining: 0, resetAt, limit: 5 }),
+      recordFailure: () => Promise.resolve(),
+      reset: () => Promise.resolve(),
+    };
+    const limitedUseCase = new RegisterUserWithPassword(unitOfWork, hasher, blockingLimiter);
+
+    await expect(limitedUseCase.execute(VALID)).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(RateLimitExceededError);
+      const rateLimitErr = err as RateLimitExceededError;
+      expect(rateLimitErr.code).toBe("RATE_LIMIT_EXCEEDED");
+      expect(rateLimitErr.httpStatusHint).toBe(429);
+      return true;
+    });
   });
 });
