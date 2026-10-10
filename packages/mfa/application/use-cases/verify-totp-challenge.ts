@@ -15,6 +15,9 @@ import {
   MfaMethodNotFoundError,
   MfaMethodStateTransitionError,
   MfaReplayDetectedError,
+  MfaMethodMissingSecretError,
+  MfaMethodNotActiveError,
+  MfaMethodNotFoundError,
 } from "../../domain/errors.js";
 import type { TotpAlgorithm } from "../../domain/services/totp-algorithm.js";
 import type { MfaMethodRepository } from "../ports/mfa-method-repository.js";
@@ -33,6 +36,12 @@ export type VerifyTotpChallengeError =
   | MfaMethodMissingSecretError
   | InvalidTotpCodeError
   | MfaCodeAlreadyUsedError;
+  | ValidationError
+  | AccountLockedError
+  | MfaMethodNotFoundError
+  | MfaMethodNotActiveError
+  | MfaMethodMissingSecretError
+  | InvalidTotpCodeError;
 
 /**
  * Verifies a submitted TOTP code against an active method during login or step-up.
@@ -75,6 +84,11 @@ export class VerifyTotpChallenge {
           "Method is not active.",
         ),
       );
+      return Result.err(new MfaMethodNotFoundError("MFA method not found."));
+    }
+
+    if (method.status !== "active") {
+      return Result.err(new MfaMethodNotActiveError("Method is not active."));
     }
 
     const now = new Date();
@@ -115,6 +129,7 @@ export class VerifyTotpChallenge {
         return Result.err(new MfaCodeAlreadyUsedError("Code has already been used."));
       }
       throw error;
+      return Result.err(new InvalidTotpCodeError("Code has already been used."));
     }
   }
 }

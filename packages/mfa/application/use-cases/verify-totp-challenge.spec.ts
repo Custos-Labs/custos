@@ -180,6 +180,45 @@ describe("VerifyTotpChallenge", () => {
     if (Result.isErr(result)) {
       expect(result.error).toBeInstanceOf(ValidationError);
       expect(result.error.message).toContain("must be 6 digits");
+  it("returns 404 for a missing method (Issue 110)", async () => {
+    const { useCase } = setup();
+    const result = await useCase.execute({
+      methodId: createId<"MfaMethodId">(),
+      code: "000000",
+    });
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error.name).toBe("MfaMethodNotFoundError");
+      expect(result.error.httpStatusHint).toBe(404);
+      expect(result.error.code).toBe("MFA_METHOD_NOT_FOUND");
+    }
+  });
+
+  it("returns 409 for an inactive method (Issue 110)", async () => {
+    const { useCase, fakeRepo } = setup();
+    const method = MfaMethod.createPendingTotp(createId<"UserId">(), { value: "SECRET" });
+    await fakeRepo.save(method);
+    const result = await useCase.execute({ methodId: method.id, code: "000000" });
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error.name).toBe("MfaMethodNotActiveError");
+      expect(result.error.httpStatusHint).toBe(409);
+      expect(result.error.code).toBe("MFA_METHOD_NOT_ACTIVE");
+    }
+  });
+
+  it("returns 401 for an invalid code (Issue 110)", async () => {
+    const { useCase, fakeRepo } = setup();
+    const method = MfaMethod.createPendingTotp(createId<"UserId">(), {
+      value: "SECRET",
+    }).activate();
+    await fakeRepo.save(method);
+    const result = await useCase.execute({ methodId: method.id, code: "000000" });
+    expect(Result.isErr(result)).toBe(true);
+    if (Result.isErr(result)) {
+      expect(result.error.name).toBe("InvalidTotpCodeError");
+      expect(result.error.httpStatusHint).toBe(401);
+      expect(result.error.code).toBe("INVALID_TOTP_CODE");
     }
   });
 });
