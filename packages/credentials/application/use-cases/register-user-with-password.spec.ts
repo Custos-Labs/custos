@@ -1,4 +1,5 @@
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";

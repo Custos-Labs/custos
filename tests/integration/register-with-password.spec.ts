@@ -4,7 +4,8 @@ import {
   RegisterUserWithPassword,
 } from "@verixa/credentials";
 import { DisplayName, Email, User } from "@verixa/identity";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestPrismaClient, databaseAvailability } from "./helpers/database.js";

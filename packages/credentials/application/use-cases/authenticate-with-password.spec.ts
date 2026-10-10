@@ -1,6 +1,7 @@
 import { Email, type User } from "@verixa/identity";
 import type { MfaEnforcementLevel } from "@verixa/mfa";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";

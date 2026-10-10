@@ -46,11 +46,8 @@ import {
   WebAuthnAssertionVerifier,
   WebAuthnAttestationVerifier,
 } from "@verixa/mfa";
-import {
-  InMemoryEventPublisher,
-  NoopRateLimiter,
-  type DomainEventPublisher,
-} from "@verixa/shared-kernel";
+import { InMemoryEventPublisher, type DomainEventPublisher } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/infrastructure/adapters/noop-rate-limiter.js";
 import {
   LocalTransactionSigner,
   StellarHashAnchor,
