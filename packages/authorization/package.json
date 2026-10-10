@@ -24,7 +24,7 @@
     "@verixa/database": "workspace:*",
     "@vitest/coverage-v8": "^5.0.3",
     "fastify": "^5.12.1",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "supertest": "^7.3.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

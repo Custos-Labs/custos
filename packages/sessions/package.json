@@ -17,7 +17,7 @@
     "@verixa/config": "workspace:*",
     "@verixa/database": "workspace:*",
     "@verixa/shared-kernel": "workspace:*",
-    "ioredis": "^5.4.1",
+    "ioredis": "^6.0.0",
     "jose": "^6.2.12"
   },
   "devDependencies": {
