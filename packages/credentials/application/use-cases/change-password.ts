@@ -1,5 +1,11 @@
 import type { User } from "@verixa/identity";
-import { Result, ValidationError, type Id, type RateLimiter } from "@verixa/shared-kernel";
+import {
+  AuthenticationError,
+  Result,
+  ValidationError,
+  type Id,
+  type RateLimiter,
+} from "@verixa/shared-kernel";
 
 import { type PasswordHistoryPolicy } from "../../domain/value-objects/password-history-policy.js";
 import { DEFAULT_PASSWORD_HISTORY_POLICY } from "../../domain/value-objects/password-history-policy.js";
@@ -16,6 +22,8 @@ export interface ChangePasswordCommand {
 export interface ChangePasswordResult {
   readonly user: User;
 }
+
+export type ChangePasswordError = AuthenticationError | ValidationError;
 
 /**
  * Changes the authenticated user's password, requiring re-entry of the current one.
@@ -45,7 +53,7 @@ export class ChangePassword {
 
   async execute(
     command: ChangePasswordCommand,
-  ): Promise<Result<ChangePasswordResult, ValidationError>> {
+  ): Promise<Result<ChangePasswordResult, ChangePasswordError>> {
     // Validate the new password policy first, before any hashing or
     // database work. A rejected password should not advance the change.
     const passwordResult = RawPassword.create(command.newPassword, this.passwordPolicy);
@@ -97,9 +105,7 @@ export class ChangePassword {
       // Wrong re-authentication is treated as authentication failure: same
       // message, same timing (password verification is expensive and took
       // time already).
-      return Result.err(
-        new ValidationError("Current password is incorrect.", { currentPassword: ["incorrect"] }),
-      );
+      return Result.err(new AuthenticationError());
     }
 
     if (outcome.kind === "password_reused") {
