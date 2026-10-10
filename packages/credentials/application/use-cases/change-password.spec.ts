@@ -9,6 +9,15 @@ import {
   asId,
 } from "@verixa/shared-kernel";
 import { AlwaysAllowRateLimiter, Result, asId } from "@verixa/shared-kernel";
+import {
+  NoopRateLimiter,
+  RateLimitExceededError,
+  Result,
+  asId,
+  type RateLimitKey,
+  type RateLimitResult,
+  type RateLimiter,
+} from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -418,6 +427,111 @@ describe("ChangePassword (Issue 071)", () => {
       if (!Result.isErr(result)) return;
       expect(result.error).toBeInstanceOf(AuthenticationError);
       expect(result.error.httpStatusHint).toBe(401);
+    });
+  });
+
+  describe("rate limiting (Issue 061)", () => {
+    class RecordingRateLimiter implements RateLimiter {
+      failures: RateLimitKey[] = [];
+      resets: RateLimitKey[] = [];
+      checks: RateLimitKey[] = [];
+      private failureCounts: Record<string, number> = {};
+
+      constructor(private readonly limit: number = 3) {}
+
+      check(key: RateLimitKey): Promise<RateLimitResult> {
+        this.checks.push(key);
+        const count = this.failureCounts[key.identifier] ?? 0;
+        const allowed = count < this.limit;
+        return Promise.resolve({
+          allowed,
+          remaining: Math.max(0, this.limit - count),
+          resetAt: Date.now() + 60_000,
+          limit: this.limit,
+        });
+      }
+
+      recordFailure(key: RateLimitKey): Promise<void> {
+        this.failures.push(key);
+        this.failureCounts[key.identifier] = (this.failureCounts[key.identifier] ?? 0) + 1;
+        return Promise.resolve();
+      }
+
+      reset(key: RateLimitKey): Promise<void> {
+        this.resets.push(key);
+        delete this.failureCounts[key.identifier];
+        return Promise.resolve();
+      }
+    }
+
+    it("limits repeated wrong-current-password attempts", async () => {
+      const limiter = new RecordingRateLimiter(3);
+      const change = new ChangePassword(unitOfWork, hasher, limiter);
+
+      // Exhaust the budget with wrong current passwords
+      for (let i = 0; i < 3; i++) {
+        const r = await change.execute({
+          userId: user.id,
+          currentPassword: "wrong password attempt",
+          newPassword: NEW_PASSWORD,
+        });
+        expect(Result.isErr(r)).toBe(true);
+      }
+
+      expect(limiter.failures).toHaveLength(3);
+      expect(limiter.failures[0]?.action).toBe("password-change");
+      expect(limiter.failures[0]?.identifier).toBe(user.id);
+
+      // The 4th attempt is blocked by rate limiting before password verification
+      await expect(
+        change.execute({
+          userId: user.id,
+          currentPassword: "wrong password attempt",
+          newPassword: NEW_PASSWORD,
+        }),
+      ).rejects.toThrow(RateLimitExceededError);
+
+      // A correct current password after reset succeeds
+      await limiter.reset({ action: "password-change", identifier: user.id });
+      const ok = await change.execute({
+        userId: user.id,
+        currentPassword: PASSWORD,
+        newPassword: NEW_PASSWORD,
+      });
+      expect(Result.isOk(ok)).toBe(true);
+    });
+
+    it("resets rate limit on successful password change", async () => {
+      const limiter = new RecordingRateLimiter(3);
+      const change = new ChangePassword(unitOfWork, hasher, limiter);
+
+      const ok = await change.execute({
+        userId: user.id,
+        currentPassword: PASSWORD,
+        newPassword: NEW_PASSWORD,
+      });
+
+      expect(Result.isOk(ok)).toBe(true);
+      expect(limiter.resets).toHaveLength(1);
+      expect(limiter.resets[0]?.action).toBe("password-change");
+      expect(limiter.resets[0]?.identifier).toBe(user.id);
+    });
+
+    it("does not record rate limit failure when new password policy validation fails", async () => {
+      const limiter = new RecordingRateLimiter(3);
+      const change = new ChangePassword(unitOfWork, hasher, limiter, {
+        minLength: 10,
+        maxLength: 128,
+      });
+
+      const result = await change.execute({
+        userId: user.id,
+        currentPassword: PASSWORD,
+        newPassword: "short",
+      });
+
+      expect(Result.isErr(result)).toBe(true);
+      expect(limiter.failures).toHaveLength(0);
     });
   });
 });

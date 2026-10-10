@@ -170,6 +170,7 @@ describe("RateLimiter port", () => {
         "register",
         "password-reset",
         "email-verification",
+        "password-change",
       ];
 
       for (const action of actions) {

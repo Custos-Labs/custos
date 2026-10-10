@@ -4,6 +4,11 @@ import {
   Result,
   ValidationError,
   type Id,
+  RateLimitExceededError,
+  Result,
+  ValidationError,
+  type Id,
+  type RateLimitKey,
   type RateLimiter,
 } from "@verixa/shared-kernel";
 
@@ -54,6 +59,18 @@ export class ChangePassword {
   async execute(
     command: ChangePasswordCommand,
   ): Promise<Result<ChangePasswordResult, ChangePasswordError>> {
+  ): Promise<Result<ChangePasswordResult, ValidationError>> {
+    // 1. Check rate limit BEFORE any other logic
+    const rateLimitKey: RateLimitKey = {
+      action: "password-change",
+      identifier: command.userId,
+    };
+
+    const limitResult = await this.rateLimiter.check(rateLimitKey);
+    if (!limitResult.allowed) {
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
+    }
+
     // Validate the new password policy first, before any hashing or
     // database work. A rejected password should not advance the change.
     const passwordResult = RawPassword.create(command.newPassword, this.passwordPolicy);
@@ -106,6 +123,11 @@ export class ChangePassword {
       // message, same timing (password verification is expensive and took
       // time already).
       return Result.err(new AuthenticationError());
+      // time already). Record failure so repeated guessing is rate limited.
+      await this.rateLimiter.recordFailure(rateLimitKey);
+      return Result.err(
+        new ValidationError("Current password is incorrect.", { currentPassword: ["incorrect"] }),
+      );
     }
 
     if (outcome.kind === "password_reused") {
@@ -133,6 +155,9 @@ export class ChangePassword {
       const rotated = credential.rotatePassword(newHash, this.passwordHistoryPolicy);
       await repositories.credentials.save(rotated);
     });
+
+    // Reset rate limit counter on successful password change
+    await this.rateLimiter.reset(rateLimitKey);
 
     return Result.ok({ user: outcome.user });
   }
