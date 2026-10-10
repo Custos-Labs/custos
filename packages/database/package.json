@@ -20,6 +20,7 @@
     "benchmark:audit": "tsx scripts/benchmark-audit-queries.ts",
     "db:validate": "prisma validate",
     "db:format:check": "prisma format --check",
+    "db:format": "prisma format",
     "db:drift": "prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --shadow-database-url $SHADOW_DATABASE_URL --exit-code"
   },
   "dependencies": {

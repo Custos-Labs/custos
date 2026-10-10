@@ -41,7 +41,7 @@ const baseMetadataSchema = z.object({}).strict();
 
 const ipAddressSchema = z
   .object({
-    ipAddress: z.string().ip().optional(),
+    ipAddress: z.union([z.string().ipv4(), z.string().ipv6()]).optional(),
     userAgent: z.string().optional(),
   })
   .strict();

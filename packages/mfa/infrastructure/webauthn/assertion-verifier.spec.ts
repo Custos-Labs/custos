@@ -106,7 +106,7 @@ describe("WebAuthnAssertionVerifier", () => {
 
   it("successfully verifies a valid assertion signed with a PEM public key", async () => {
     const keyPair = generateTestEcKeyPair();
-    const pemKey = keyPair.publicKey.export({ format: "pem", type: "spki" }) as string;
+    const pemKey = keyPair.publicKey.export({ format: "pem", type: "spki" });
 
     const authData = createAuthData({ rpId, signCount: 10 });
     const clientDataJSON = createClientDataJSON({ challenge, origin });

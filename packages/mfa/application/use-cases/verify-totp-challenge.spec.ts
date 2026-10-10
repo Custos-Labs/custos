@@ -180,6 +180,9 @@ describe("VerifyTotpChallenge", () => {
     if (Result.isErr(result)) {
       expect(result.error).toBeInstanceOf(ValidationError);
       expect(result.error.message).toContain("must be 6 digits");
+    }
+  });
+
   it("returns 404 for a missing method (Issue 110)", async () => {
     const { useCase } = setup();
     const result = await useCase.execute({

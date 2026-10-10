@@ -688,7 +688,7 @@ model MfaMethod {
   createdAt DateTime @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @map("updated_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   webAuthnCredential WebAuthnCredential?
 
   /// Partial unique index (migration 20261009190000): at most one ACTIVE
@@ -740,10 +740,10 @@ model WebAuthnCredential {
   /// Attestation format (e.g. "none", "packed").
   attestationType String @map("attestation_type")
 
-  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   mfaMethod MfaMethod @relation(fields: [mfaMethodId], references: [id], onDelete: Cascade)
 
   @@index([userId])

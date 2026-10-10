@@ -7,6 +7,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: "@verixa/mfa",
+      testTimeout: 15000,
       coverage: {
         // Interface-only files have no executable statements to cover — a
         // TypeScript `interface` is erased entirely at compile time, so

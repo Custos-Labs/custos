@@ -14,9 +14,7 @@ import type {
 } from "fastify";
 
 import type { AuthorizationRepository } from "../application/authorization-repository.js";
-import { AuthorizationError } from "../domain/errors/authorization-error.js";
-import { AuthorizationError as LegacyAuthorizationError } from "../domain/authorization.js";
-import { AuthorizationError } from "../domain/authorization.js";
+import { AuthorizationError as LegacyAuthorizationError } from "../domain/errors/authorization-error.js";
 import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
 
 interface RoleParams {
@@ -71,16 +69,6 @@ function toSharedError(error: unknown): unknown {
     }
   }
   return error;
-function errorStatus(error: unknown): number {
-  if (error instanceof SystemRoleImmutableError) return 403;
-  if (!(error instanceof AuthorizationError)) return 500;
-  return error.code === "NOT_FOUND"
-    ? 404
-    : error.code === "CONFLICT"
-      ? 409
-      : error.code === "INVALID"
-        ? 400
-        : 403;
 }
 
 /** Thin adapter: the shared mapping, sent through this route's reply shape. */
@@ -88,8 +76,6 @@ function sendRouteError(
   reply: { code: (status: number) => { send: (body: object) => unknown } },
   error: unknown,
 ): unknown {
-  const { status, body } = toHttpError(toSharedError(error));
-  return reply.code(status).send(body);
   if (error instanceof SystemRoleImmutableError) {
     return reply.code(403).send({
       code: error.code,
@@ -97,15 +83,8 @@ function sendRouteError(
       attemptedAction: error.attemptedAction,
     });
   }
-  const status = errorStatus(error);
-  return reply.code(status).send({
-    error:
-      status === 403
-        ? "Forbidden"
-        : error instanceof Error
-          ? error.message
-          : "Internal server error",
-  });
+  const { status, body } = toHttpError(toSharedError(error));
+  return reply.code(status).send(body);
 }
 
 /** Registers the complete RBAC management surface. Authentication is supplied

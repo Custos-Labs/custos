@@ -8,13 +8,6 @@ import type {
 } from "../application/authorization-repository.js";
 import type { RoleRecord } from "../domain/entities/role.js";
 import { AuthorizationError } from "../domain/errors/authorization-error.js";
-import type { AuthorizationRepository } from "../application/authorization-repository.js";
-import {
-  AuthorizationError,
-  Role,
-  type RoleAssignment,
-  type RoleRecord,
-} from "../domain/authorization.js";
 import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
 
 type RoleWithPermissions = {
