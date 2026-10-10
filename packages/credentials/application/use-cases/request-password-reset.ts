@@ -1,5 +1,11 @@
 import { Email } from "@verixa/identity";
-import { Result, type ValidationError, RateLimiter, RateLimitKey } from "@verixa/shared-kernel";
+import {
+  RateLimitExceededError,
+  type RateLimiter,
+  type RateLimitKey,
+  Result,
+  type ValidationError,
+} from "@verixa/shared-kernel";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";
 import type { CredentialNotifier } from "../ports/credential-notifier.js";
@@ -7,6 +13,13 @@ import type { CredentialsUnitOfWork } from "../ports/credentials-unit-of-work.js
 
 export interface RequestPasswordResetCommand {
   readonly email: string;
+  /**
+   * Caller identifier (e.g. client IP address, session ID, or user agent).
+   * When provided, the rate-limit key partitions by both recipient and requester,
+   * preventing an external caller from exhausting or clearing another requester's quota.
+   */
+  readonly requesterId?: string;
+  readonly requester?: string;
 }
 
 export interface RequestPasswordResetResult {
@@ -36,18 +49,25 @@ export interface RequestPasswordResetResult {
  *
  * ## Rate limiting
  *
- * The rate limiter is consulted at the start via the {@link RateLimiter} port,
- * and reset on success so users can legitimately request another reset if
- * needed. If not allowed, an error is thrown immediately. This prevents
- * mail-bombing attacks against known addresses.
+ * The rate limiter is consulted at the start via the {@link RateLimiter} port.
+ * To prevent cross-caller denial of service (where an attacker exhausts the reset
+ * budget for a victim's email address) and counter manipulation, the rate limit key
+ * is bound to both the email address and the requester identifier (e.g. source IP
+ * or session id) when supplied.
  *
- * ## Deliberately not solved here
+ * Unlike authentication failure counters which reset upon a successful login, the
+ * password reset request counter is NOT reset on success. Resetting on success would
+ * allow an attacker or script targeting an existing account to send unlimited reset
+ * emails (mail-bombing) by simply having each request succeed, or clear the accumulated
+ * budget for other requesters.
  *
- * Nothing rate-limits this beyond the configured limit. Anyone can trigger
- * reset emails to any address as fast as they can post (up to the rate limit),
- * which is both a mail-bombing vector and a way to invalidate a real user's
- * outstanding link repeatedly. Rate limiting (Phase 15) provides the abuse
- * mitigation.
+ * If not allowed, a {@link RateLimitExceededError} is thrown immediately.
+ *
+ * ## Abuse control and mail-bombing
+ *
+ * Binding the rate limit key to the requester prevents an external actor from
+ * exhausting a legitimate user's reset quota. Per-recipient ceilings or global
+ * IP throttling may additionally be layered by rate limiting middleware / gateways.
  */
 export class RequestPasswordReset {
   constructor(
@@ -60,18 +80,17 @@ export class RequestPasswordReset {
   async execute(
     command: RequestPasswordResetCommand,
   ): Promise<Result<RequestPasswordResetResult, ValidationError>> {
-    // 1. Check rate limit BEFORE any other logic
+    // 1. Check rate limit BEFORE any other logic.
+    // Bind key to both email and requester (if provided) to isolate budgets across callers.
+    const requester = command.requesterId ?? command.requester;
     const rateLimitKey: RateLimitKey = {
       action: "password-reset",
-      identifier: command.email,
+      identifier: requester ? `${command.email}:${requester}` : command.email,
     };
 
     const limitResult = await this.rateLimiter.check(rateLimitKey);
     if (!limitResult.allowed) {
-      throw new Error(
-        `Rate limit exceeded for ${rateLimitKey.action} on ${rateLimitKey.identifier}. ` +
-          `Resets at ${new Date(limitResult.resetAt).toISOString()}`,
-      );
+      throw new RateLimitExceededError(rateLimitKey, limitResult.resetAt, limitResult.limit);
     }
 
     const emailResult = Email.create(command.email);
@@ -129,8 +148,9 @@ export class RequestPasswordReset {
       // Intentionally ignored. See above.
     }
 
-    // Reset rate limit counter on successful reset request
-    await this.rateLimiter.reset(rateLimitKey);
+    // Note: We deliberately do NOT reset the rate limiter counter on success.
+    // Resetting on success would allow unthrottled mail-bombing against existing accounts
+    // and would allow one caller to clear accumulated abuse counters.
 
     return Result.ok({ issued: true });
   }
