@@ -50,6 +50,11 @@ import { NoopRateLimiter } from "@verixa/shared-kernel/infrastructure/adapters/n
 import {
   AnchorBalanceMonitor,
   HorizonAccountBalanceReader,
+  AlwaysAllowRateLimiter,
+  InMemoryEventPublisher,
+  type DomainEventPublisher,
+} from "@verixa/shared-kernel";
+import {
   LocalTransactionSigner,
   StellarHashAnchor,
   loggingFundingAlerter,
@@ -347,13 +352,13 @@ export function buildContainer(
   // a step someone has to remember to add later — the most commonly missed
   // part of a reset flow.
   //
-  // `NoopRateLimiter` always allows requests — rate limiting is Phase 15.
+  // `AlwaysAllowRateLimiter` permits every request — rate limiting is Phase 15.
   // It is wired as the default adapter so use cases work before the real
-  // limiter exists. No changes to use cases required when the real one
-  // arrives — only a new adapter and a new wire in composition root.
+  // limiter exists. The name is the warning: this is the absence of rate limiting,
+  // not a policy. Phase 15 replaces this one line.
   const credentialNotifier = new NullCredentialNotifier();
   const sessionRevoker = new NoSessionsRevoker();
-  const rateLimiter = new NoopRateLimiter();
+  const rateLimiter = new AlwaysAllowRateLimiter();
 
   // Audit recording. Failures are logged and never propagated -- see
   // RecordAuditEvent on why a failed audit write must not fail the operation

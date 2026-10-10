@@ -3,6 +3,7 @@ import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import type { User } from "@verixa/identity";
 import { ConflictError, NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -27,7 +28,7 @@ describe("RegisterUserWithPassword", () => {
 
   beforeEach(() => {
     unitOfWork = new InMemoryCredentialsUnitOfWork();
-    useCase = new RegisterUserWithPassword(unitOfWork, hasher, new NoopRateLimiter());
+    useCase = new RegisterUserWithPassword(unitOfWork, hasher, new AlwaysAllowRateLimiter());
   });
 
   it("creates both a user and a credential", async () => {

@@ -1,6 +1,12 @@
 import { Email, type User } from "@verixa/identity";
 import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
+import {
+  AlwaysAllowRateLimiter,
+  AccountLockedError,
+  AuthenticationError,
+  Result,
+} from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Credential } from "../../domain/entities/credential.js";
@@ -43,12 +49,17 @@ describe("AuthenticateWithPassword — lockout", () => {
   beforeEach(async () => {
     unitOfWork = new InMemoryCredentialsUnitOfWork();
     hasher = new Argon2PasswordHasher(FAST);
-    authenticate = new AuthenticateWithPassword(unitOfWork, hasher, new NoopRateLimiter(), POLICY);
+    authenticate = new AuthenticateWithPassword(
+      unitOfWork,
+      hasher,
+      new AlwaysAllowRateLimiter(),
+      POLICY,
+    );
 
     const registered = await new RegisterUserWithPassword(
       unitOfWork,
       hasher,
-      new NoopRateLimiter(),
+      new AlwaysAllowRateLimiter(),
     ).execute({
       email: EMAIL,
       displayName: "Alice",
@@ -166,7 +177,7 @@ describe("AuthenticateWithPassword — lockout", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         counting,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         POLICY,
       );
 

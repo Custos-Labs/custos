@@ -6,6 +6,7 @@ import {
 import { DisplayName, Email, User } from "@verixa/identity";
 import { Result } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
+import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestPrismaClient, databaseAvailability } from "./helpers/database.js";
@@ -29,7 +30,7 @@ describe.skipIf(!available)("RegisterUserWithPassword (real Postgres)", () => {
   const useCase = new RegisterUserWithPassword(
     new PrismaCredentialsUnitOfWork(prisma),
     hasher,
-    new NoopRateLimiter(),
+    new AlwaysAllowRateLimiter(),
   );
 
   beforeAll(async () => {

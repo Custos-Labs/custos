@@ -8,6 +8,7 @@ import {
   ValidationError,
   asId,
 } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, Result, asId } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -25,21 +26,21 @@ const ANOTHER_PASSWORD = "yet another password phrase";
 describe("ChangePassword (Issue 071)", () => {
   let unitOfWork: InMemoryCredentialsUnitOfWork;
   let hasher: Argon2PasswordHasher;
-  let rateLimiter: NoopRateLimiter;
+  let rateLimiter: AlwaysAllowRateLimiter;
   let changePassword: ChangePassword;
   let user: User;
 
   beforeEach(async () => {
     unitOfWork = new InMemoryCredentialsUnitOfWork();
     hasher = new Argon2PasswordHasher(FAST);
-    rateLimiter = new NoopRateLimiter();
+    rateLimiter = new AlwaysAllowRateLimiter();
     changePassword = new ChangePassword(unitOfWork, hasher, rateLimiter);
 
     // Register a test user
     const registered = await new RegisterUserWithPassword(
       unitOfWork,
       hasher,
-      new NoopRateLimiter(),
+      new AlwaysAllowRateLimiter(),
     ).execute({
       email: EMAIL,
       displayName: "Alice",
@@ -352,7 +353,7 @@ describe("ChangePassword (Issue 071)", () => {
       const registered = await new RegisterUserWithPassword(
         unitOfWork,
         hasher,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
       ).execute({
         email: "bob@example.com",
         displayName: "Bob",
