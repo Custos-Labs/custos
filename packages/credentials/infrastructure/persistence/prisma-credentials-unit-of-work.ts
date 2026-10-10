@@ -6,6 +6,7 @@ import type {
   CredentialsUnitOfWork,
 } from "../../application/ports/credentials-unit-of-work.js";
 
+import { mapUnitOfWorkError } from "./credentials-error-mapper.js";
 import { PrismaCredentialRepository } from "./prisma-credential-repository.js";
 import {
   PrismaEmailVerificationTokenRepository,
@@ -24,20 +25,24 @@ import {
 export class PrismaCredentialsUnitOfWork implements CredentialsUnitOfWork {
   constructor(private readonly prisma: PrismaClient) {}
 
-  run<T>(work: (repositories: CredentialsRepositories) => Promise<T>): Promise<T> {
-    return this.prisma.$transaction((tx) => {
-      const client = tx as unknown as PrismaClient;
+  async run<T>(work: (repositories: CredentialsRepositories) => Promise<T>): Promise<T> {
+    try {
+      return await this.prisma.$transaction((tx) => {
+        const client = tx as unknown as PrismaClient;
 
-      const repositories: CredentialsRepositories = {
-        users: new PrismaUserRepository(client),
-        credentials: new PrismaCredentialRepository(client),
-        emailVerificationTokens: new PrismaEmailVerificationTokenRepository(
-          client.emailVerificationToken,
-        ),
-        passwordResetTokens: new PrismaPasswordResetTokenRepository(client.passwordResetToken),
-      };
+        const repositories: CredentialsRepositories = {
+          users: new PrismaUserRepository(client),
+          credentials: new PrismaCredentialRepository(client),
+          emailVerificationTokens: new PrismaEmailVerificationTokenRepository(
+            client.emailVerificationToken,
+          ),
+          passwordResetTokens: new PrismaPasswordResetTokenRepository(client.passwordResetToken),
+        };
 
-      return work(repositories);
-    });
+        return work(repositories);
+      });
+    } catch (error) {
+      mapUnitOfWorkError(error);
+    }
   }
 }
