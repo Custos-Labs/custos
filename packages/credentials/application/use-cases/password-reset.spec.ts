@@ -1,6 +1,14 @@
 import { Email, type User } from "@verixa/identity";
 import { Result } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
+import {
+  NoopRateLimiter,
+  RateLimitExceededError,
+  type RateLimiter,
+  type RateLimitKey,
+  type RateLimitResult,
+  Result,
+} from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";
@@ -42,6 +50,39 @@ class RecordingSessionRevoker implements SessionRevoker {
   revokeAllForUser(userId: string): Promise<void> {
     if (this.shouldThrow) return Promise.reject(new Error("session store unreachable"));
     this.revoked.push(userId);
+    return Promise.resolve();
+  }
+}
+
+class InMemoryRateLimiter implements RateLimiter {
+  readonly checks: RateLimitKey[] = [];
+  readonly resets: RateLimitKey[] = [];
+  readonly failures: RateLimitKey[] = [];
+  private readonly attempts = new Map<string, number>();
+
+  constructor(private readonly limit = 2) {}
+
+  check(key: RateLimitKey): Promise<RateLimitResult> {
+    this.checks.push(key);
+    const count = (this.attempts.get(key.identifier) ?? 0) + 1;
+    this.attempts.set(key.identifier, count);
+    const allowed = count <= this.limit;
+    return Promise.resolve({
+      allowed,
+      remaining: Math.max(0, this.limit - count),
+      resetAt: Date.now() + 60_000,
+      limit: this.limit,
+    });
+  }
+
+  recordFailure(key: RateLimitKey): Promise<void> {
+    this.failures.push(key);
+    return Promise.resolve();
+  }
+
+  reset(key: RateLimitKey): Promise<void> {
+    this.resets.push(key);
+    this.attempts.delete(key.identifier);
     return Promise.resolve();
   }
 }
@@ -156,6 +197,71 @@ describe("password reset (Issues 069 and 070)", () => {
       const result = await request.execute({ email: EMAIL });
 
       expect(Result.isOk(result)).toBe(true);
+    });
+
+    describe("rate limiting (Issue 063)", () => {
+      it("does not share a single budget across two different callers for the same address", async () => {
+        const limiter = new InMemoryRateLimiter(2);
+        const rateLimitedRequest = new RequestPasswordReset(unitOfWork, notifier, limiter);
+
+        // Caller A uses up their limit of 2 requests
+        await rateLimitedRequest.execute({ email: EMAIL, requester: "caller-a" });
+        await rateLimitedRequest.execute({ email: EMAIL, requester: "caller-a" });
+
+        // Caller A's 3rd request is blocked by rate limiter
+        await expect(
+          rateLimitedRequest.execute({ email: EMAIL, requester: "caller-a" }),
+        ).rejects.toThrow(RateLimitExceededError);
+
+        // Caller B requesting for the SAME address succeeds because their budget is separate
+        const callerBResult = await rateLimitedRequest.execute({
+          email: EMAIL,
+          requester: "caller-b",
+        });
+        expect(Result.isOk(callerBResult) && callerBResult.value.issued).toBe(true);
+      });
+
+      it("ensures one caller cannot clear another caller's accumulated counter with a successful request", async () => {
+        const limiter = new InMemoryRateLimiter(2);
+        const rateLimitedRequest = new RequestPasswordReset(unitOfWork, notifier, limiter);
+
+        // Caller B makes 2 requests (exhausting their budget)
+        await rateLimitedRequest.execute({ email: EMAIL, requester: "caller-b" });
+        await rateLimitedRequest.execute({ email: EMAIL, requester: "caller-b" });
+
+        // Caller B is now rate limited
+        await expect(
+          rateLimitedRequest.execute({ email: EMAIL, requester: "caller-b" }),
+        ).rejects.toThrow(RateLimitExceededError);
+
+        // Caller A executes a successful request for the same address
+        const callerAResult = await rateLimitedRequest.execute({
+          email: EMAIL,
+          requester: "caller-a",
+        });
+        expect(Result.isOk(callerAResult) && callerAResult.value.issued).toBe(true);
+
+        // Caller A's success only resets Caller A's key. Caller B remains locked out!
+        await expect(
+          rateLimitedRequest.execute({ email: EMAIL, requester: "caller-b" }),
+        ).rejects.toThrow(RateLimitExceededError);
+      });
+
+      it("falls back to per-email key when requester is omitted", async () => {
+        const limiter = new InMemoryRateLimiter(1);
+        const rateLimitedRequest = new RequestPasswordReset(unitOfWork, notifier, limiter);
+
+        await rateLimitedRequest.execute({ email: EMAIL });
+        expect(limiter.checks[0]?.identifier).toBe(EMAIL);
+      });
+
+      it("supports requesterId property synonymously with requester", async () => {
+        const limiter = new InMemoryRateLimiter(1);
+        const rateLimitedRequest = new RequestPasswordReset(unitOfWork, notifier, limiter);
+
+        await rateLimitedRequest.execute({ email: EMAIL, requesterId: "session-xyz" });
+        expect(limiter.checks[0]?.identifier).toBe(`${EMAIL}:session-xyz`);
+      });
     });
   });
 
