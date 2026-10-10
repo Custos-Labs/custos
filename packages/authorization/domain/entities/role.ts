@@ -19,6 +19,18 @@ import { Permission } from "../value-objects/permission.js";
 export type OrgId = Id<"OrganizationId">;
 export type RoleId = Id<"RoleId">;
 
+/**
+ * Persistence shape for a role, as read from Prisma or an in-memory repository.
+ * (Moved from the retired domain/authorization.ts legacy module.)
+ */
+export interface RoleRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly isSystemRole: boolean;
+  readonly permissions: readonly string[];
+}
+
 export interface RoleProps {
   readonly id: RoleId;
   readonly name: string;

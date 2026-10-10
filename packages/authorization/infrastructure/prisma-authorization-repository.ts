@@ -2,13 +2,12 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaClientKnownRequestError, type PrismaClient } from "@verixa/database";
 
-import type { AuthorizationRepository } from "../application/authorization-repository.js";
-import {
-  AuthorizationError,
-  Role,
-  type RoleAssignment,
-  type RoleRecord,
-} from "../domain/authorization.js";
+import type {
+  AuthorizationRepository,
+  RoleAssignment,
+} from "../application/authorization-repository.js";
+import type { RoleRecord } from "../domain/entities/role.js";
+import { AuthorizationError } from "../domain/errors/authorization-error.js";
 
 type RoleWithPermissions = {
   id: string;
@@ -176,14 +175,10 @@ export class PrismaAuthorizationRepository implements AuthorizationRepository {
       },
       include: { role: { include: { permissions: { include: { permission: true } } } } },
     });
-    return rows.some((row) =>
-      new Role({
-        id: row.role.id,
-        name: row.role.name,
-        description: row.role.description ?? "",
-        isSystemRole: row.role.isSystemRole,
-        permissions: row.role.permissions.map((permission) => permission.permission.key),
-      }).hasPermission(key),
-    );
+    const resource = key.split(":")[0];
+    return rows.some((row) => {
+      const perms = row.role.permissions.map((permission) => permission.permission.key);
+      return perms.includes("*:*") || perms.includes(key) || perms.includes(`${resource}:*`);
+    });
   }
 }

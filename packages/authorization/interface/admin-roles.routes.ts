@@ -7,7 +7,7 @@ import type {
 } from "fastify";
 
 import type { AuthorizationRepository } from "../application/authorization-repository.js";
-import { AuthorizationError } from "../domain/authorization.js";
+import { AuthorizationError } from "../domain/errors/authorization-error.js";
 
 interface RoleParams {
   roleId: string;
