@@ -15,14 +15,11 @@ export class MfaMethodMapper {
       lastUsedAt: row.lastUsedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      // Lockout/replay state is domain-only for now: the `mfa_methods` table
-      // has no columns for it yet, so it is reset on rehydration rather than
-      // silently lost in the middle of a session. A follow-up migration will
-      // persist these when the rate-limiting guarantees are needed across
-      // requests (see docs/security/mfa-design.md).
-      failedAttempts: 0,
-      lockedUntil: null,
-      lastUsedStep: null,
+      // Persisted since Issue 100: the lockout and replay state now survives
+      // rehydration instead of being reset here.
+      failedAttempts: row.failedAttempts,
+      lockedUntil: row.lockedUntil,
+      lastUsedStep: row.lastUsedStep,
     });
   }
 
@@ -37,6 +34,9 @@ export class MfaMethodMapper {
       lastUsedAt: method.lastUsedAt,
       createdAt: method.createdAt,
       updatedAt: method.updatedAt,
+      failedAttempts: method.failedAttempts,
+      lockedUntil: method.lockedUntil,
+      lastUsedStep: method.lastUsedStep,
     };
   }
 }
