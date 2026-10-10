@@ -61,6 +61,8 @@ Origin and RP-ID binding is what makes WebAuthn phishing-resistant:
 - When Verixa's `AttestationVerifier` verifies the attestation against the real RP ID (`verixa.example`) and real expected origin (`https://verixa.example`), the origin and RP ID hash checks mechanically fail.
 - Unlike a TOTP code or SMS code—which a user can be deceived into relaying to an adversary—WebAuthn binding is enforced by client cryptographic hardware and browser security boundaries, rendering credential-forwarding attacks impossible.
 
+The values those checks compare against come from `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` (resolved in `apps/api/src/composition-root.ts`, defaulting to `localhost` / `http://localhost:3000` when unset). Set both to the production values in deployment — the RP ID is the bare domain (`verixa.example`), and the origin is the full origin (`https://verixa.example`).
+
 #### Single-Use and Time-Bounded Challenge Lifecycle
 
 To protect against replay attacks and pre-computed registration responses:
