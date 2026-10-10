@@ -192,5 +192,27 @@ describe("AssignPermissionToRole & RevokePermissionFromRole", () => {
         expect(result.error.code).toBe("NOT_FOUND");
       }
     });
+
+    it("does not relabel an unexpected error from revoke as a system-role rejection", async () => {
+      const boom = new TypeError("cannot read property of undefined");
+      const fakeRole = {
+        id: asId<"RoleId">("role_unexpected"),
+        revoke: () => {
+          throw boom;
+        },
+      };
+      const fakeRepo = {
+        findById: () => Promise.resolve(fakeRole as unknown as Role),
+        save: () => Promise.resolve(),
+      };
+      const useCase = new RevokePermissionFromRole(fakeRepo as never);
+
+      await expect(
+        useCase.execute({
+          roleId: asId<"RoleId">("role_unexpected"),
+          permission: "users:read",
+        }),
+      ).rejects.toBe(boom);
+    });
   });
 });
