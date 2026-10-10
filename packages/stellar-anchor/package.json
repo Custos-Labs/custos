@@ -16,7 +16,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^16.2.0",
+    "@stellar/stellar-sdk": "^17.2.1",
     "@verixa/shared-kernel": "workspace:*"
   },
   "devDependencies": {
