@@ -202,9 +202,12 @@ export function registerVerificationRoutes<TLogger extends FastifyBaseLogger>(
     };
     const data = multipart.file?.();
 
-    const size = data?.file ? await getStreamSize(data.file) : 1024;
-
-    if (size > 10 * 1024 * 1024) {
+    try {
+      if (data?.file) {
+        await assertStreamWithinLimit(data.file, MAX_EVIDENCE_BYTES);
+      }
+    } catch (error) {
+      if (!(error instanceof EvidenceTooLargeError)) throw error;
       return (reply as FastifyReply).status(400).send({
         error: {
           code: "INVALID_EVIDENCE",
@@ -268,10 +271,52 @@ export function registerVerificationRoutes<TLogger extends FastifyBaseLogger>(
   );
 }
 
-async function getStreamSize(stream: NodeJS.ReadableStream): Promise<number> {
-  let size = 0;
-  for await (const chunk of stream) {
-    size += chunk.length;
-  }
-  return size;
+export class EvidenceTooLargeError extends Error {}
+
+export const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Accumulates the stream's size, aborting as soon as the running total
+ * exceeds `limit`. The stream is destroyed on abort so the remainder of
+ * the body is never read through the process — the old `getStreamSize`
+ * drained the entire upload first and only then decided the status code,
+ * so the limit bounded nothing but the response.
+ */
+export async function assertStreamWithinLimit(
+  stream: NodeJS.ReadableStream,
+  limit: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const onData = (chunk: Buffer | string) => {
+      size += chunk.length;
+      if (size > limit) {
+        cleanup();
+        if (
+          "destroy" in stream &&
+          typeof (stream as { destroy?: () => void }).destroy === "function"
+        ) {
+          (stream as { destroy: () => void }).destroy();
+        }
+        reject(new EvidenceTooLargeError());
+      }
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (err: unknown) => {
+      cleanup();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+    const cleanup = () => {
+      stream.removeListener("data", onData);
+      stream.removeListener("end", onEnd);
+      stream.removeListener("error", onError);
+    };
+
+    stream.on("data", onData);
+    stream.on("end", onEnd);
+    stream.on("error", onError);
+  });
 }
