@@ -1,5 +1,11 @@
 import { Email, type User } from "@verixa/identity";
-import { NoopRateLimiter, Result, asId } from "@verixa/shared-kernel";
+import {
+  AuthenticationError,
+  NoopRateLimiter,
+  Result,
+  ValidationError,
+  asId,
+} from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -121,10 +127,11 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
-      expect(result.error.fieldErrors["currentPassword"]).toContain("incorrect");
+      expect(result.error).toBeInstanceOf(AuthenticationError);
+      expect(result.error.httpStatusHint).toBe(401);
     });
 
-    it("error message is generic for wrong current password", async () => {
+    it("wrong current password is indistinguishable by message from a failed login", async () => {
       const result = await changePassword.execute({
         userId: user.id,
         currentPassword: "wrong password",
@@ -133,8 +140,32 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
-      // Case-insensitive: the message is a sentence, so it is capitalised.
-      expect(result.error.message.toLowerCase()).toContain("current password is incorrect");
+      expect(result.error.message).toBe(new AuthenticationError().message);
+    });
+
+    it("distinguishes wrong password (401) from malformed input (400) by status only", async () => {
+      const wrongPassword = await changePassword.execute({
+        userId: user.id,
+        currentPassword: "wrong password",
+        newPassword: NEW_PASSWORD,
+      });
+      const malformed = await changePassword.execute({
+        userId: user.id,
+        currentPassword: "wrong password",
+        newPassword: "short", // fails the password policy
+      });
+
+      expect(Result.isErr(wrongPassword) && wrongPassword.error.httpStatusHint).toBe(401);
+      expect(Result.isErr(malformed) && malformed.error.httpStatusHint).toBe(400);
+      if (Result.isErr(malformed)) {
+        // The 400 keeps its field errors (correctable input); the 401 carries
+        // none — a 401 means re-prompt, not correct-and-retry.
+        expect(malformed.error).toBeInstanceOf(ValidationError);
+      }
+      if (Result.isErr(wrongPassword)) {
+        expect(wrongPassword.error).toBeInstanceOf(AuthenticationError);
+        expect("fieldErrors" in wrongPassword.error).toBe(false);
+      }
     });
 
     it("does not change password on wrong current", async () => {
@@ -164,6 +195,8 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
+      expect(result.error).toBeInstanceOf(ValidationError);
+      if (!(result.error instanceof ValidationError)) return;
       expect(result.error.fieldErrors["password"]).toContain("too_short");
 
       // Original password still works
@@ -183,6 +216,8 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
+      expect(result.error).toBeInstanceOf(ValidationError);
+      if (!(result.error instanceof ValidationError)) return;
       // Password error, not auth error
       expect(result.error.fieldErrors["password"]).toContain("too_short");
     });
@@ -198,6 +233,8 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
+      expect(result.error).toBeInstanceOf(ValidationError);
+      if (!(result.error instanceof ValidationError)) return;
       expect(result.error.fieldErrors["password"]).toContain("reused");
     });
 
@@ -228,6 +265,8 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
+      expect(result.error).toBeInstanceOf(ValidationError);
+      if (!(result.error instanceof ValidationError)) return;
       expect(result.error.fieldErrors["password"]).toContain("reused");
     });
 
@@ -374,7 +413,8 @@ describe("ChangePassword (Issue 071)", () => {
 
       expect(Result.isErr(result)).toBe(true);
       if (!Result.isErr(result)) return;
-      expect(result.error.fieldErrors["currentPassword"]).toContain("incorrect");
+      expect(result.error).toBeInstanceOf(AuthenticationError);
+      expect(result.error.httpStatusHint).toBe(401);
     });
   });
 });

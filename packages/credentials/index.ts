@@ -58,6 +58,7 @@ export type { PasswordHasher } from "./application/ports/password-hasher.js";
 export {
   ChangePassword,
   type ChangePasswordCommand,
+  type ChangePasswordError,
   type ChangePasswordResult,
 } from "./application/use-cases/change-password.js";
 export {
