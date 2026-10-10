@@ -1,29 +1,16 @@
-import { DomainError, RateLimitExceededError, ValidationError } from "@verixa/shared-kernel";
+import {
+  DomainError,
+  RateLimitExceededError,
+  toHttpError,
+  type ErrorResponseBody as SharedErrorResponseBody,
+} from "@verixa/shared-kernel";
 import type { FastifyReply } from "fastify";
 
-/**
- * The single response shape every error uses.
- *
- * Fixed deliberately. Clients that have to branch on the *shape* of an error
- * before they can read it end up with per-endpoint parsing, and the endpoint
- * that drifts is the one nobody notices until a client crashes on it.
- */
 export interface ErrorResponseBody {
-  readonly error: {
-    /** Stable, machine-readable. Safe to branch on; `message` is not. */
-    readonly code: string;
-    /** Human-readable. May be reworded at any time without it being a breaking change. */
-    readonly message: string;
-    /** Present only for validation failures: which field failed, and why. */
-    readonly fields?: Readonly<Record<string, readonly string[]>>;
-    /** Present only for 429s: seconds until the client may retry. */
+  readonly error: SharedErrorResponseBody["error"] & {
     readonly retryAfter?: number;
   };
 }
-import { DomainError, toHttpError, type ErrorResponseBody } from "@verixa/shared-kernel";
-import type { FastifyReply } from "fastify";
-
-export type { ErrorResponseBody };
 
 /** Sends a domain error as an HTTP response. */
 export function sendDomainError(reply: FastifyReply, error: DomainError): void {
@@ -32,13 +19,10 @@ export function sendDomainError(reply: FastifyReply, error: DomainError): void {
       ? Math.max(0, Math.ceil((error.resetAt - Date.now()) / 1000))
       : undefined;
 
-  const body: ErrorResponseBody = {
+  const { status, body } = toHttpError(error);
+  const responseBody: ErrorResponseBody = {
     error: {
-      code: error.code,
-      message: error.message,
-      ...(error instanceof ValidationError && Object.keys(error.fieldErrors).length > 0
-        ? { fields: error.fieldErrors }
-        : {}),
+      ...body.error,
       ...(retryAfter !== undefined ? { retryAfter } : {}),
     },
   };
@@ -47,9 +31,7 @@ export function sendDomainError(reply: FastifyReply, error: DomainError): void {
     void reply.header("Retry-After", String(retryAfter));
   }
 
-  void reply.status(error.httpStatusHint).send(body);
-  const { status, body } = toHttpError(error);
-  void reply.status(status).send(body);
+  void reply.status(status).send(responseBody);
 }
 
 /** Sends a generic 500 for anything that is not a `DomainError`. The detail is logged, never returned. */

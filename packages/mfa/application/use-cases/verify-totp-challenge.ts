@@ -12,10 +12,6 @@ import {
   InvalidTotpCodeError,
   MfaCodeAlreadyUsedError,
   MfaMethodMissingSecretError,
-  MfaMethodNotFoundError,
-  MfaMethodStateTransitionError,
-  MfaReplayDetectedError,
-  MfaMethodMissingSecretError,
   MfaMethodNotActiveError,
   MfaMethodNotFoundError,
 } from "../../domain/errors.js";
@@ -29,19 +25,6 @@ export interface VerifyTotpChallengeCommand {
 
 export type VerifyTotpChallengeError =
   NotFoundError | ConflictError | AuthenticationError | AccountLockedError | ValidationError;
-  | AccountLockedError
-  | ValidationError
-  | MfaMethodNotFoundError
-  | MfaMethodStateTransitionError
-  | MfaMethodMissingSecretError
-  | InvalidTotpCodeError
-  | MfaCodeAlreadyUsedError;
-  | ValidationError
-  | AccountLockedError
-  | MfaMethodNotFoundError
-  | MfaMethodNotActiveError
-  | MfaMethodMissingSecretError
-  | InvalidTotpCodeError;
 
 /**
  * Verifies a submitted TOTP code against an active method during login or step-up.
@@ -67,23 +50,6 @@ export class VerifyTotpChallenge {
     const method = await this.mfaMethodRepository.findById(methodId);
 
     if (!method) {
-      return Result.err(new NotFoundError("MFA method not found."));
-    }
-
-    if (method.status !== "active") {
-      return Result.err(new ConflictError("Method is not active."));
-      return Result.err(new MfaMethodNotFoundError("MFA method not found."));
-    }
-
-    if (method.status !== "active") {
-      return Result.err(
-        new MfaMethodStateTransitionError(
-          method.id,
-          method.status,
-          "verify",
-          "Method is not active.",
-        ),
-      );
       return Result.err(new MfaMethodNotFoundError("MFA method not found."));
     }
 
@@ -97,7 +63,6 @@ export class VerifyTotpChallenge {
     }
 
     if (!method.secret) {
-      return Result.err(new ConflictError("MFA method is missing its secret."));
       return Result.err(new MfaMethodMissingSecretError("MFA method is missing its secret."));
     }
 
@@ -107,7 +72,6 @@ export class VerifyTotpChallenge {
     if (matchedStep === null) {
       const updatedMethod = method.recordFailedAttempt(now);
       await this.mfaMethodRepository.save(updatedMethod);
-      return Result.err(new AuthenticationError("Invalid TOTP code."));
       return Result.err(new InvalidTotpCodeError("Invalid TOTP code."));
     }
 
@@ -120,16 +84,7 @@ export class VerifyTotpChallenge {
       // Replay detected
       const updatedMethod = method.recordFailedAttempt(now);
       await this.mfaMethodRepository.save(updatedMethod);
-      return Result.err(new ConflictError("Code has already been used."));
-    } catch (error) {
-      if (error instanceof MfaReplayDetectedError) {
-        // Replay detected
-        const updatedMethod = method.recordFailedAttempt(now);
-        await this.mfaMethodRepository.save(updatedMethod);
-        return Result.err(new MfaCodeAlreadyUsedError("Code has already been used."));
-      }
-      throw error;
-      return Result.err(new InvalidTotpCodeError("Code has already been used."));
+      return Result.err(new MfaCodeAlreadyUsedError("Code has already been used."));
     }
   }
 }

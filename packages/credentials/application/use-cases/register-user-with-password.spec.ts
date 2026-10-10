@@ -1,9 +1,10 @@
-import { Result } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
-import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import type { User } from "@verixa/identity";
-import { ConflictError, NoopRateLimiter, Result } from "@verixa/shared-kernel";
-import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
+import {
+  ConflictError,
+  RateLimitExceededError,
+  Result,
+  AlwaysAllowRateLimiter,
+} from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";
@@ -135,6 +136,8 @@ describe("RegisterUserWithPassword", () => {
       expect(rateLimitErr.httpStatusHint).toBe(429);
       return true;
     });
+  });
+
   it("returns the pre-flight ConflictError when the write loses a duplicate-email race", async () => {
     const uow = new InMemoryCredentialsUnitOfWork();
     // Blind the pre-flight check: the duplicate lands between the check and
@@ -151,7 +154,7 @@ describe("RegisterUserWithPassword", () => {
       seenEmails.add(email);
       return innerSave(user);
     };
-    const racing = new RegisterUserWithPassword(uow, hasher, new NoopRateLimiter());
+    const racing = new RegisterUserWithPassword(uow, hasher, new AlwaysAllowRateLimiter());
 
     const first = await racing.execute(VALID);
     expect(Result.isOk(first)).toBe(true);

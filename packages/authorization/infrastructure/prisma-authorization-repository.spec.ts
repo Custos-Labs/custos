@@ -1,7 +1,8 @@
 import { Prisma, type PrismaClient } from "@verixa/database";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { AuthorizationError } from "../domain/authorization.js";
+import { AuthorizationError } from "../domain/errors/authorization-error.js";
+import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
 
 import { PrismaAuthorizationRepository } from "./prisma-authorization-repository.js";
 
@@ -63,14 +64,6 @@ describe("PrismaAuthorizationRepository", () => {
     });
   });
 });
-import type { PrismaClient } from "@verixa/database";
-import { describe, expect, it, vi } from "vitest";
-
-import { AuthorizationError } from "../domain/authorization.js";
-import { SystemRoleImmutableError } from "../domain/errors/system-role-immutable-error.js";
-
-import { PrismaAuthorizationRepository } from "./prisma-authorization-repository.js";
-
 describe("PrismaAuthorizationRepository", () => {
   describe("deleteRole", () => {
     it("throws AuthorizationError('NOT_FOUND') when role does not exist", async () => {

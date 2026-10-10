@@ -1,6 +1,4 @@
 import { Email, type User } from "@verixa/identity";
-import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import {
   AlwaysAllowRateLimiter,
   AccountLockedError,

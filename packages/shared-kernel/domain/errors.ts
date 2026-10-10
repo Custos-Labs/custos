@@ -43,13 +43,13 @@ export class ValidationError extends DomainError {
 
 /** The requested resource does not exist (or the caller may not know it does). */
 export class NotFoundError extends DomainError {
-  readonly code = "NOT_FOUND";
+  readonly code: string = "NOT_FOUND";
   readonly httpStatusHint = 404;
 }
 
 /** The request conflicts with the current state of the resource (e.g. a duplicate). */
 export class ConflictError extends DomainError {
-  readonly code = "CONFLICT";
+  readonly code: string = "CONFLICT";
   readonly httpStatusHint = 409;
 }
 
@@ -90,7 +90,7 @@ export class AuthorizationError extends DomainError {
  * See `docs/security/authentication-flows.md`.
  */
 export class AuthenticationError extends DomainError {
-  readonly code = "AUTHENTICATION_FAILED";
+  readonly code: string = "AUTHENTICATION_FAILED";
   readonly httpStatusHint = 401;
 
   constructor(message = "Invalid email or password.", options?: ErrorOptions) {

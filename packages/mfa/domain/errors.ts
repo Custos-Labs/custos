@@ -1,4 +1,9 @@
-import { DomainError } from "@verixa/shared-kernel";
+import {
+  AuthenticationError,
+  ConflictError,
+  DomainError,
+  NotFoundError,
+} from "@verixa/shared-kernel";
 
 export type MfaMethodAction = "activate" | "disable" | "verify";
 
@@ -8,8 +13,8 @@ export type MfaMethodAction = "activate" | "disable" | "verify";
  * or attempting to verify with an inactive method).
  */
 export class MfaMethodStateTransitionError extends DomainError {
-  readonly code = "MFA_METHOD_INVALID_STATE_TRANSITION";
-  readonly httpStatusHint = 409;
+  override readonly code = "MFA_METHOD_INVALID_STATE_TRANSITION";
+  override readonly httpStatusHint = 409;
   readonly methodId: string;
   readonly currentStatus: string;
   readonly attemptedAction: MfaMethodAction;
@@ -47,8 +52,8 @@ export class MfaMethodStateTransitionError extends DomainError {
  * Thrown when a replayed TOTP step is detected.
  */
 export class MfaReplayDetectedError extends DomainError {
-  readonly code = "MFA_REPLAY_DETECTED";
-  readonly httpStatusHint = 409;
+  override readonly code = "MFA_REPLAY_DETECTED";
+  override readonly httpStatusHint = 409;
   readonly methodId: string;
   readonly attemptedStep: number;
   readonly lastUsedStep: number;
@@ -78,50 +83,51 @@ export class MfaReplayDetectedError extends DomainError {
 }
 
 /** The requested MFA method does not exist. */
-export class MfaMethodNotFoundError extends DomainError {
-  readonly code = "MFA_METHOD_NOT_FOUND";
-  readonly httpStatusHint = 404;
+export class MfaMethodNotFoundError extends NotFoundError {
+  override readonly code = "MFA_METHOD_NOT_FOUND";
+  override readonly httpStatusHint = 404;
+  constructor(message = "MFA method not found.") {
+    super(message);
+    this.name = "MfaMethodNotFoundError";
+  }
 }
 
 /** The MFA method is missing its secret. */
-export class MfaMethodMissingSecretError extends DomainError {
-  readonly code = "MFA_METHOD_MISSING_SECRET";
-  readonly httpStatusHint = 409;
+export class MfaMethodMissingSecretError extends ConflictError {
+  override readonly code = "MFA_METHOD_MISSING_SECRET";
+  override readonly httpStatusHint = 409;
+  constructor(message = "MFA method is missing its secret.") {
+    super(message);
+    this.name = "MfaMethodMissingSecretError";
+  }
 }
 
 /** An invalid or expired TOTP code was submitted. */
-export class InvalidTotpCodeError extends DomainError {
-  readonly code = "INVALID_TOTP_CODE";
-  readonly httpStatusHint = 401;
+export class InvalidTotpCodeError extends AuthenticationError {
+  override readonly code = "INVALID_TOTP_CODE";
+  override readonly httpStatusHint = 401;
+  constructor(message = "Invalid TOTP code.") {
+    super(message);
+    this.name = "InvalidTotpCodeError";
+  }
 }
 
 /** The submitted code was already consumed (replay detected). */
-export class MfaCodeAlreadyUsedError extends DomainError {
-  readonly code = "MFA_CODE_ALREADY_USED";
-  readonly httpStatusHint = 409;
-}
-import { DomainError } from "@verixa/shared-kernel";
-
-/** The requested MFA method does not exist. */
-export class MfaMethodNotFoundError extends DomainError {
-  readonly code = "MFA_METHOD_NOT_FOUND";
-  readonly httpStatusHint = 404;
+export class MfaCodeAlreadyUsedError extends ConflictError {
+  override readonly code = "MFA_CODE_ALREADY_USED";
+  override readonly httpStatusHint = 409;
+  constructor(message = "Code has already been used.") {
+    super(message);
+    this.name = "MfaCodeAlreadyUsedError";
+  }
 }
 
 /** The MFA method is not in active status. */
-export class MfaMethodNotActiveError extends DomainError {
-  readonly code = "MFA_METHOD_NOT_ACTIVE";
-  readonly httpStatusHint = 409;
-}
-
-/** The MFA method is missing its secret. */
-export class MfaMethodMissingSecretError extends DomainError {
-  readonly code = "MFA_METHOD_MISSING_SECRET";
-  readonly httpStatusHint = 409;
-}
-
-/** An invalid or expired TOTP code was submitted. */
-export class InvalidTotpCodeError extends DomainError {
-  readonly code = "INVALID_TOTP_CODE";
-  readonly httpStatusHint = 401;
+export class MfaMethodNotActiveError extends ConflictError {
+  override readonly code = "MFA_METHOD_NOT_ACTIVE";
+  override readonly httpStatusHint = 409;
+  constructor(message = "Method is not active.") {
+    super(message);
+    this.name = "MfaMethodNotActiveError";
+  }
 }

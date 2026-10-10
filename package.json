@@ -18,7 +18,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm --filter @verixa/api^... run build && pnpm --filter @verixa/api run dev",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r --workspace-concurrency=1 run test",
     "test:coverage": "pnpm -r run test:coverage",
     "lint": "eslint .",
     "check:env": "node scripts/check-env-example.mjs",

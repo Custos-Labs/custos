@@ -1,9 +1,6 @@
 import { Email, type User } from "@verixa/identity";
 import type { MfaEnforcementLevel } from "@verixa/mfa";
-import { Result } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
-import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
-import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
+import { AlwaysAllowRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_LOCKOUT_POLICY } from "../../domain/value-objects/lockout-policy.js";
@@ -148,7 +145,7 @@ describe("AuthenticateWithPassword", () => {
       const useCase = new AuthenticateWithPassword(
         unitOfWork,
         hasher,
-        new NoopRateLimiter(),
+        new AlwaysAllowRateLimiter(),
         DEFAULT_LOCKOUT_POLICY,
         mfaChecker,
       );

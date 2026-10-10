@@ -1,16 +1,12 @@
 import { Email, type User } from "@verixa/identity";
-import { Result } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import {
-  NoopRateLimiter,
+  AlwaysAllowRateLimiter,
   RateLimitExceededError,
   type RateLimiter,
   type RateLimitKey,
   type RateLimitResult,
   Result,
 } from "@verixa/shared-kernel";
-import { NoopRateLimiter, RateLimitExceededError, Result } from "@verixa/shared-kernel";
-import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";

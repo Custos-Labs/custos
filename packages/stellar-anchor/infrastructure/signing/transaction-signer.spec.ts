@@ -61,20 +61,18 @@ describe("publicKeyFromSecret", () => {
 });
 
 describe("KmsTransactionSigner", () => {
-  it("satisfies the signing contract through a fake key service", () => {
-    const kms = fakeKmsClient();
+  const kms = fakeKmsClient();
 
-    transactionSignerContract({
-      createSigner: () =>
-        new KmsTransactionSigner({
-          keyId: KEY_ID,
-          accountId: kms.keypair.publicKey(),
-          client: kms.client,
-        }),
-      // The adapter holds no key material, so there is nothing to leak: the
-      // assertions run and cannot fail, which is the point of the shape.
-      secretMarker: "SECRETMATERIAL",
-    });
+  transactionSignerContract({
+    createSigner: () =>
+      new KmsTransactionSigner({
+        keyId: KEY_ID,
+        accountId: kms.keypair.publicKey(),
+        client: kms.client,
+      }),
+    // The adapter holds no key material, so there is nothing to leak: the
+    // assertions run and cannot fail, which is the point of the shape.
+    secretMarker: "SECRETMATERIAL",
   });
 
   it("never receives the private key", async () => {

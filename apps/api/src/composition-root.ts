@@ -51,17 +51,15 @@ import {
   type MfaMethodRepository,
   type MfaMethodType,
 } from "@verixa/mfa";
-import { InMemoryEventPublisher, type DomainEventPublisher } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/infrastructure/adapters/noop-rate-limiter.js";
 import {
-  AnchorBalanceMonitor,
-  HorizonAccountBalanceReader,
   AlwaysAllowRateLimiter,
   asId,
   InMemoryEventPublisher,
   type DomainEventPublisher,
 } from "@verixa/shared-kernel";
 import {
+  AnchorBalanceMonitor,
+  HorizonAccountBalanceReader,
   LocalTransactionSigner,
   StellarHashAnchor,
   loggingFundingAlerter,
@@ -315,14 +313,15 @@ class ConfigMfaChecker implements MfaChecker {
   ) {}
 
   resolvePolicy(): Promise<MfaEnforcementLevel> {
-    const level =
+    const level: MfaEnforcementLevel =
       typeof this.enforcementLevel === "function"
         ? this.enforcementLevel()
-        : (this.enforcementLevel ?? loadConfig().MFA_ENFORCEMENT_LEVEL);
-    const methods =
+        : (this.enforcementLevel ?? this.resolveGlobalLevel());
+
+    const methods: readonly MfaMethodType[] =
       typeof this.allowedMethods === "function"
         ? this.allowedMethods()
-        : (this.allowedMethods ?? (loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[]));
+        : (this.allowedMethods ?? this.resolveGlobalMethods());
 
     return Promise.resolve(
       MfaEnforcementPolicy.resolve({
@@ -330,6 +329,29 @@ class ConfigMfaChecker implements MfaChecker {
         allowedMethods: methods,
       }).level,
     );
+  }
+
+  private resolveGlobalLevel(): MfaEnforcementLevel {
+    try {
+      return loadConfig().MFA_ENFORCEMENT_LEVEL;
+    } catch {
+      const val = process.env["MFA_ENFORCEMENT_LEVEL"];
+      return val === "required" || val === "disabled" ? val : "optional";
+    }
+  }
+
+  private resolveGlobalMethods(): readonly MfaMethodType[] {
+    try {
+      return loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[];
+    } catch {
+      const val = process.env["MFA_ALLOWED_METHODS"];
+      return val
+        ? (val
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean) as MfaMethodType[])
+        : [];
+    }
   }
 
   async listActiveMethods(
@@ -516,8 +538,27 @@ export function buildContainer(
   const mfaMethodRepo = overrides.mfaMethodRepository ?? new InMemoryMfaMethodRepository();
   const mfaChecker: MfaChecker = new ConfigMfaChecker(
     mfaMethodRepo,
-    () => loadConfig().MFA_ENFORCEMENT_LEVEL,
-    () => loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[],
+    () => {
+      try {
+        return loadConfig().MFA_ENFORCEMENT_LEVEL;
+      } catch {
+        const val = process.env["MFA_ENFORCEMENT_LEVEL"];
+        return val === "required" || val === "disabled" ? val : "optional";
+      }
+    },
+    () => {
+      try {
+        return loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[];
+      } catch {
+        const val = process.env["MFA_ALLOWED_METHODS"];
+        return val
+          ? (val
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean) as MfaMethodType[])
+          : [];
+      }
+    },
   );
   const webAuthnCredentialRepo = new InMemoryWebAuthnCredentialRepository();
   const webAuthnChallengeRepo = new InMemoryWebAuthnChallengeRepository();

@@ -23,13 +23,10 @@ export {
   MfaReplayDetectedError,
   MfaMethodNotFoundError,
   MfaMethodMissingSecretError,
+  MfaMethodNotActiveError,
   InvalidTotpCodeError,
   MfaCodeAlreadyUsedError,
   type MfaMethodAction,
-  InvalidTotpCodeError,
-  MfaMethodMissingSecretError,
-  MfaMethodNotActiveError,
-  MfaMethodNotFoundError,
 } from "./domain/errors.js";
 
 // Domain: value objects

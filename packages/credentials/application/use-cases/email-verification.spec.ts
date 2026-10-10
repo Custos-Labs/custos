@@ -1,6 +1,4 @@
 import { Email, type User } from "@verixa/identity";
-import { Result } from "@verixa/shared-kernel";
-import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { AlwaysAllowRateLimiter, Result } from "@verixa/shared-kernel";
 import { beforeEach, describe, expect, it } from "vitest";
 

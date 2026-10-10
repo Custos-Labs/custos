@@ -54,7 +54,9 @@ export async function startTestRedis(): Promise<TestRedis | undefined> {
   } catch (error) {
     client.disconnect();
     if (process.env.REQUIRE_REDIS_TESTS === "1") {
-      throw new Error(`REQUIRE_REDIS_TESTS=1 but ${url} is unreachable: ${String(error)}`);
+      throw new Error(`REQUIRE_REDIS_TESTS=1 but ${url} is unreachable: ${String(error)}`, {
+        cause: error,
+      });
     }
     return undefined;
   }
