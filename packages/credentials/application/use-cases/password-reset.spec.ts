@@ -1,5 +1,6 @@
 import { Email, type User } from "@verixa/identity";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PasswordResetToken } from "../../domain/entities/password-reset-token.js";

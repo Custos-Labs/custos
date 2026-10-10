@@ -1,10 +1,6 @@
 import { Email, type User } from "@verixa/identity";
-import {
-  NoopRateLimiter,
-  AccountLockedError,
-  AuthenticationError,
-  Result,
-} from "@verixa/shared-kernel";
+import { AccountLockedError, AuthenticationError, Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Credential } from "../../domain/entities/credential.js";

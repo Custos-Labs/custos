@@ -1,5 +1,6 @@
 import { Email, type User } from "@verixa/identity";
-import { NoopRateLimiter, Result, asId } from "@verixa/shared-kernel";
+import { Result, asId } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Argon2PasswordHasher } from "../../infrastructure/argon2-password-hasher.js";

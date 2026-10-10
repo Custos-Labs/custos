@@ -8,7 +8,8 @@ import {
   RequestPasswordReset,
 } from "@verixa/credentials";
 import { PrismaUserRepository, RegisterUser, UserStatusChanged } from "@verixa/identity";
-import { NoopRateLimiter, Result } from "@verixa/shared-kernel";
+import { Result } from "@verixa/shared-kernel";
+import { NoopRateLimiter } from "@verixa/shared-kernel/testing";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { createTestPrismaClient, databaseAvailability } from "./helpers/database.js";
