@@ -22,11 +22,11 @@
     "@types/node": "^22.10.0",
     "@types/supertest": "^7.2.1",
     "@verixa/database": "workspace:*",
-    "@vitest/coverage-v8": "^3.2.6",
+    "@vitest/coverage-v8": "^5.0.3",
     "fastify": "^5.12.1",
     "ioredis": "^5.11.1",
     "supertest": "^7.3.1",
     "typescript": "^5.7.2",
-    "vitest": "^3.2.6"
+    "vitest": "^5.0.3"
   }
 }
