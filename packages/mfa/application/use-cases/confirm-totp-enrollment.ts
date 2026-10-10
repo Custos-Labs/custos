@@ -64,7 +64,18 @@ export class ConfirmTotpEnrollment {
       return Result.err(new Error("Invalid TOTP code."));
     }
 
-    // 6. On success, activate and reset attempts (Acceptance Criteria 1)
+    // 6. On success, swap: disable any currently-active method of the same
+    // type first, then activate the confirmed one. The partial unique index
+    // is the backstop — two concurrent confirmations race here, and the
+    // loser's save fails with a unique violation (surfaced as ConflictError
+    // by the persistence error-mapper) instead of silently minting a second
+    // active secret.
+    const actives = await this.mfaMethodRepository.findActiveByUserId(method.userId);
+    for (const other of actives) {
+      if (other.type === method.type && other.id !== method.id) {
+        await this.mfaMethodRepository.save(other.disable(now));
+      }
+    }
     const activatedMethod = method.activate(now);
     await this.mfaMethodRepository.save(activatedMethod);
 
