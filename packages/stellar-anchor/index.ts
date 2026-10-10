@@ -18,7 +18,10 @@ export {
   type KmsSignRequest,
   type KmsTransactionSignerOptions,
 } from "./infrastructure/signing/kms-transaction-signer.js";
-export { LocalTransactionSigner } from "./infrastructure/signing/local-transaction-signer.js";
+export {
+  LocalTransactionSigner,
+  publicKeyFromSecret,
+} from "./infrastructure/signing/local-transaction-signer.js";
 // Funding monitoring: the balance port, its metric and alert shapes, and the
 // stroop arithmetic. The monitor itself stays out — see below.
 export {
