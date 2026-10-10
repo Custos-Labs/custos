@@ -31,7 +31,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@stellar/stellar-sdk": "^16.2.0",
+    "@stellar/stellar-sdk": "^17.2.1",
     "@types/node": "^26.6.4",
     "@verixa/stellar-anchor": "workspace:*",
     "@vitest/coverage-v8": "^3.2.6",
