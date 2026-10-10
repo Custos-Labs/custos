@@ -124,13 +124,17 @@ jobs:
       - name: Scan the diff for credentials
         run: |
           set -eu
-          diff="$(git diff origin/${{ github.base_ref }}...HEAD -- . \
-            ':(exclude).github/workflows/*' || true)"
+          # Include workflow changes: CI definitions can contain live credentials.
+          diff="$(git diff origin/${{ github.base_ref }}...HEAD -- . || true)"
+
+          # Suppress only the repository's exact non-production smoke-test
+          # placeholder, never arbitrary values named SESSION_ACCESS_TOKEN_SECRET.
+          diff="$(printf '%s\n' "$diff" | sed 's/ci-smoke-test-secret-at-least-32-characters/CI_TEST/g')"
 
           # Deliberately narrow. A scanner that fires on every base64 string
           # gets ignored within a week, and an ignored scanner is worse than
           # none because it produces the feeling of coverage.
-          if printf '%s' "$diff" | grep -nE '^\+.*(SECRET_KEY|PRIVATE_KEY|-----BEGIN [A-Z ]*PRIVATE KEY-----)[^A-Z_]*[=:][[:space:]]*["'"'"'][^"'"'"']{16,}' ; then
+          if printf '%s' "$diff" | grep -nE '^\+.*([A-Z_]*(SECRET|TOKEN|API_KEY|PRIVATE_KEY)[A-Z_]*|-----BEGIN [A-Z ]*PRIVATE KEY-----)[^A-Z_]*[=:][[:space:]]*["'"'"'][^"'"'"']{16,}' ; then
             echo "::error::What looks like a real secret is being committed."
             echo "Use an environment variable and document it in .env.example."
             exit 1
