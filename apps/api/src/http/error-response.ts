@@ -20,19 +20,12 @@ export interface ErrorResponseBody {
     readonly retryAfter?: number;
   };
 }
+import { DomainError, toHttpError, type ErrorResponseBody } from "@verixa/shared-kernel";
+import type { FastifyReply } from "fastify";
 
-/**
- * Sends a domain error as an HTTP response.
- *
- * The status comes from `httpStatusHint` on the error itself, so routes do
- * not each maintain a switch mapping error classes to status codes — the
- * classic place where two endpoints quietly disagree about what a conflict
- * is.
- *
- * Only `DomainError` subclasses reach here. Anything else is a bug or an
- * infrastructure failure, and is deliberately *not* translated: see
- * {@link sendUnexpectedError}.
- */
+export type { ErrorResponseBody };
+
+/** Sends a domain error as an HTTP response. */
 export function sendDomainError(reply: FastifyReply, error: DomainError): void {
   const retryAfter =
     error instanceof RateLimitExceededError
@@ -55,31 +48,15 @@ export function sendDomainError(reply: FastifyReply, error: DomainError): void {
   }
 
   void reply.status(error.httpStatusHint).send(body);
+  const { status, body } = toHttpError(error);
+  void reply.status(status).send(body);
 }
 
-/**
- * Sends a generic 500 for anything that is not a `DomainError`.
- *
- * The detail is logged, never returned. An unexpected failure is by
- * definition one nobody anticipated, so its message can contain anything — a
- * connection string, a SQL fragment naming a column, a stack trace exposing
- * paths. Returning it hands an attacker reconnaissance for free, and gives a
- * legitimate client nothing it can act on either.
- *
- * `DomainError` messages *are* returned, because those are written for
- * callers and say only what the caller already knows.
- */
+/** Sends a generic 500 for anything that is not a `DomainError`. The detail is logged, never returned. */
 export function sendUnexpectedError(reply: FastifyReply, error: unknown): void {
   reply.log.error({ err: error }, "unhandled error in request");
-
-  const body: ErrorResponseBody = {
-    error: {
-      code: "INTERNAL_ERROR",
-      message: "An unexpected error occurred.",
-    },
-  };
-
-  void reply.status(500).send(body);
+  const { status, body } = toHttpError(error);
+  void reply.status(status).send(body);
 }
 
 /** Routes `error` to the right handler based on whether it is a domain error. */
