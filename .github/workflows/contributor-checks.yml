@@ -55,12 +55,20 @@ jobs:
         \ \"::warning::Changed a repository adapter without a contract test in sight.\"\
         \n  echo \"Every adapter should pass the shared contract suite — see\"\n \
         \ echo \"packages/identity/infrastructure/testing/contracts/.\"\nfi\n"
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        fetch-depth: 0
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 22
+        cache: pnpm
   secrets:
     timeout-minutes: 15
     name: No secrets committed
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         fetch-depth: 0
     - name: Scan the diff for credentials
@@ -86,7 +94,7 @@ jobs:
     name: Pull request shape
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         fetch-depth: 0
     - name: Assess size and scope
@@ -120,7 +128,7 @@ jobs:
       if: steps.assess.outputs.added > 600 || steps.assess.outputs.packages > 2 ||
         steps.description.outputs.words < 15
       continue-on-error: true
-      uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
       with:
         script: "const added = Number('${{ steps.assess.outputs.added }}');\nconst\
           \ packages = Number('${{ steps.assess.outputs.packages }}');\nconst words\
@@ -161,7 +169,7 @@ jobs:
     name: No duplicate keys in .env.example
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 1
     - name: Fail on duplicated keys
@@ -175,7 +183,7 @@ jobs:
     name: New code has tests
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         fetch-depth: 0
     - name: Compare source and test changes
@@ -224,13 +232,23 @@ jobs:
         \ add a pinned override in pnpm-workspace.yaml with a\"\n  echo \"comment\
         \ explaining the decision — there are existing examples there.\"\n  exit 1\n\
         fi\n"
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        fetch-depth: 0
+    - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      if: steps.lock.outputs.changed == 'true'
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      if: steps.lock.outputs.changed == 'true'
+      with:
+        node-version: 22
+        cache: pnpm
   welcome:
     timeout-minutes: 10
     name: First-time contributor
     runs-on: ubuntu-latest
     if: github.event.action == 'opened'
     steps:
-    - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
       with:
         script: "const { data: pulls } = await github.rest.pulls.list({\n  owner:\
           \ context.repo.owner,\n  repo: context.repo.repo,\n  state: 'all',\n  per_page:\
