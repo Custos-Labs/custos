@@ -1,11 +1,10 @@
-import { asId, type Id } from "@verixa/shared-kernel";
-import type { WebAuthnCredential as PrismaWebAuthnCredential } from "@prisma/client";
+import type { WebAuthnCredential as PrismaWebAuthnCredential } from "@verixa/database";
+import { asId } from "@verixa/shared-kernel";
 
 import {
   WebAuthnCredential,
   type AuthenticatorTransport,
 } from "../../domain/entities/webauthn-credential.js";
-import type { MfaMethodId } from "../../domain/entities/mfa-method.js";
 
 export class WebAuthnCredentialMapper {
   static toDomain(raw: PrismaWebAuthnCredential): WebAuthnCredential {
