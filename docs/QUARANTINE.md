@@ -1,8 +1,8 @@
 # Quarantined packages
 
-`packages/sessions` and `packages/verification` do not build.
-Their `build`, `typecheck`, `test` and `lint` scripts are deliberately no-ops,
-and eslint skips them, so the rest of the repository — and the open pull
+`packages/sessions` does not build.
+Its `build`, `typecheck`, `test` and `lint` scripts are deliberately no-ops,
+and eslint skips it, so the rest of the repository — and the open pull
 request queue — can be verified and merged.
 
 **No contributor's work has been deleted.** Every file is still in the
@@ -64,6 +64,15 @@ Fixing the packages without fixing that would just rebuild the same wreck.
 Several open pull requests rebuild parts of these packages properly. Merging
 those — with CI green — is likely to be a faster route than reconciling the
 current state by hand.
+
+## Lifted: `packages/verification` (2026-10-09)
+
+Released from quarantine. The "two or three designs" diagnosis did not hold
+for this package: the 45 files are one coherent KYC/manual-review-queue design
+(request → automated pre-check → review queue → claim → approve/reject/more-info)
+with a Prisma model, migration, and RLS policy already in place. The remaining
+work was ordinary: `RunAutomatedCheck` was missing from the curated index, the
+scripts were no-ops, and eslint ignored the package.
 
 ## Lifted: `packages/mfa`
 

@@ -1,4 +1,5 @@
 import type { Evidence } from "../../domain/entities/evidence.js";
+import type { VerificationRequest } from "../../domain/entities/verification-request.js";
 import type { ProviderCheckResult } from "../dtos/provider-check-result.js";
 
 /**
@@ -54,4 +55,9 @@ export interface VerificationProvider {
    * Checks a liveness/selfie evidence item and returns a normalized outcome.
    */
   checkLiveness(evidence: Evidence): Promise<ProviderCheckResult>;
+
+  /**
+   * Checks an entire verification request and returns a normalized outcome.
+   */
+  check?(request: VerificationRequest): Promise<ProviderCheckResult>;
 }
