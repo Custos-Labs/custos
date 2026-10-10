@@ -283,6 +283,29 @@ jobs:
             }
 
   # ---------------------------------------------------------------------------
+  # Blocking: .env.example hygiene. A duplicated key fails silently — a dotenv
+  # loader takes the last assignment, so editing any but the last has no effect.
+  # ---------------------------------------------------------------------------
+  env-example:
+    name: No duplicate keys in .env.example
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fail on duplicated keys
+        run: |
+          set -eu
+          dupes="$(grep -oE '^[A-Z][A-Z0-9_]*=' .env.example | sort | uniq -d || true)"
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate keys in .env.example: $(echo "$dupes" | tr '\n' ' ')"
+            echo "A dotenv loader takes the last assignment — keep exactly one entry per key."
+            exit 1
+          fi
+          echo "No duplicate keys in .env.example."
+
+  # ---------------------------------------------------------------------------
   # Advisory: did new behaviour arrive with tests?
   # ---------------------------------------------------------------------------
   test-coverage:
