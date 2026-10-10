@@ -9,7 +9,7 @@ import { InMemoryMfaMethodRepository } from "../../infrastructure/testing/in-mem
 import type { StepUpAssertionStore } from "../ports/step-up-assertion-store.js";
 
 import { ConsumeBackupCode } from "./consume-backup-code.js";
-import { StepUpAuthentication } from "./step-up-authentication.js";
+import { StepUpAuthentication, type StepUpAuthenticationDeps } from "./step-up-authentication.js";
 import { VerifyTotpChallenge } from "./verify-totp-challenge.js";
 
 class InMemoryStepUpAssertionStore implements StepUpAssertionStore {
@@ -30,20 +30,23 @@ const fakeTotpAlgorithm: TotpAlgorithm = {
   verify: (_secret, code) => Promise.resolve(code === "123456" ? 1000 : null),
 };
 
-function setup() {
+function setup(overrides?: Partial<StepUpAuthenticationDeps>) {
   const repository = new InMemoryMfaMethodRepository();
   const assertionStore = new InMemoryStepUpAssertionStore();
   const auditLogger = { record: vi.fn().mockResolvedValue(undefined) };
   const verifyTotpChallenge = new VerifyTotpChallenge(repository, fakeTotpAlgorithm);
   const consumeBackupCode = new ConsumeBackupCode(repository, auditLogger);
 
-  const useCase = new StepUpAuthentication({
+  const deps: StepUpAuthenticationDeps = {
     mfaMethodRepository: repository,
     verifyTotpChallenge,
     consumeBackupCode,
     assertionStore,
     auditLogger,
-  });
+    ...overrides,
+  };
+
+  const useCase = new StepUpAuthentication(deps);
 
   return {
     repository,
@@ -52,10 +55,29 @@ function setup() {
     verifyTotpChallenge,
     consumeBackupCode,
     useCase,
+    deps,
   };
 }
 
 describe("StepUpAuthentication", () => {
+  it("skips verification for a disabled subject and verifies nothing (Issue 108)", async () => {
+    const { deps, assertionStore, verifyTotpChallenge } = setup({
+      resolvePolicy: () => Promise.resolve("disabled"),
+    });
+    const stepUp = new StepUpAuthentication(deps);
+    const spy = vi.spyOn(verifyTotpChallenge, "execute");
+    const result = await stepUp.execute({
+      userId: "u1",
+      method: { type: "totp", methodId: "m1", code: "000000" },
+    });
+    expect(Result.isOk(result)).toBe(true);
+    if (Result.isOk(result)) {
+      expect(result.value.methodType).toBeUndefined();
+    }
+    expect(spy).not.toHaveBeenCalled();
+    expect(await assertionStore.findLatest("u1")).toBeUndefined();
+  });
+
   it("verifies a TOTP code and issues a short-lived assertion", async () => {
     const { repository, useCase, auditLogger } = setup();
     const userId = createId<"UserId">();

@@ -111,6 +111,26 @@ describe("MfaEnforcementPolicy", () => {
       expect(decision.requiresEnrollment).toBe(false);
     });
 
+    it("gives disabled and optional identical thresholds but different reasons (Issue 108)", () => {
+      const disabled = MfaEnforcementPolicy.resolve({ globalDefault: "disabled" });
+      const optional = MfaEnforcementPolicy.resolve({ globalDefault: "optional" });
+
+      // Identical thresholds...
+      expect(disabled.requiresEnrollment).toBe(false);
+      expect(optional.requiresEnrollment).toBe(false);
+      expect(disabled.blocked).toBe(false);
+      expect(optional.blocked).toBe(false);
+
+      // ...divergent challenge posture.
+      expect(disabled.level).toBe("disabled");
+      expect(disabled.reason).toBe("mfa-disabled");
+      expect(optional.level).toBe("optional");
+      expect(optional.reason).toBe("mfa-optional");
+      expect(MfaEnforcementPolicy.resolve({ globalDefault: "required" }).reason).toBe(
+        "mfa-required",
+      );
+    });
+
     it("is deterministic for the same inputs", () => {
       const input = {
         globalDefault: "optional" as const,
