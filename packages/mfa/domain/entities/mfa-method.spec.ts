@@ -1,6 +1,8 @@
 import { createId } from "@verixa/shared-kernel";
 import { describe, expect, it } from "vitest";
 
+import { MfaMethodStateTransitionError, MfaReplayDetectedError } from "../errors.js";
+
 import { MfaMethod } from "./mfa-method.js";
 
 describe("MfaMethod", () => {
@@ -39,7 +41,7 @@ describe("MfaMethod", () => {
 
     it("rejects activating an already-active method", () => {
       const method = MfaMethod.create(userId, "totp").activate();
-      expect(() => method.activate()).toThrow(/already active/);
+      expect(() => method.activate()).toThrow(MfaMethodStateTransitionError);
     });
   });
 
@@ -56,7 +58,7 @@ describe("MfaMethod", () => {
 
     it("rejects disabling an already-disabled method", () => {
       const method = MfaMethod.create(userId, "totp").disable();
-      expect(() => method.disable()).toThrow(/already disabled/);
+      expect(() => method.disable()).toThrow(MfaMethodStateTransitionError);
     });
   });
 
@@ -72,12 +74,12 @@ describe("MfaMethod", () => {
 
     it("refuses to use a pending method", () => {
       const method = MfaMethod.create(userId, "totp");
-      expect(() => method.recordTotpUse(1000)).toThrow(/Only active methods/);
+      expect(() => method.recordTotpUse(1000)).toThrow(MfaMethodStateTransitionError);
     });
 
     it("refuses a replayed step", () => {
       const method = MfaMethod.create(userId, "totp").activate().recordTotpUse(1000);
-      expect(() => method.recordTotpUse(1000)).toThrow(/Replay detected/);
+      expect(() => method.recordTotpUse(1000)).toThrow(MfaReplayDetectedError);
     });
   });
 
