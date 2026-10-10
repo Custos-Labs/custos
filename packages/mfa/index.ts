@@ -67,6 +67,7 @@ export {
 export {
   ConsumeBackupCode,
   type ConsumeBackupCodeCommand,
+  type ConsumeBackupCodeError,
   type ConsumeBackupCodeOutcome,
   type ConsumeBackupCodeResult,
 } from "./application/use-cases/consume-backup-code.js";

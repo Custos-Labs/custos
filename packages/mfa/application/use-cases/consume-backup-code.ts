@@ -1,4 +1,4 @@
-import { Result } from "@verixa/shared-kernel";
+import { AccountLockedError, Result } from "@verixa/shared-kernel";
 
 import type { UserId } from "../../domain/entities/mfa-method.js";
 import { BackupCodeSet } from "../../domain/services/backup-code-set.js";
@@ -15,7 +15,9 @@ export type ConsumeBackupCodeOutcome =
   | { readonly kind: "exhausted" }
   | { readonly kind: "failed" };
 
-export type ConsumeBackupCodeResult = Result<ConsumeBackupCodeOutcome, Error>;
+export type ConsumeBackupCodeError = AccountLockedError | Error;
+
+export type ConsumeBackupCodeResult = Result<ConsumeBackupCodeOutcome, ConsumeBackupCodeError>;
 
 export class ConsumeBackupCode {
   constructor(
@@ -37,6 +39,11 @@ export class ConsumeBackupCode {
       return Result.ok({ kind: "failed" });
     }
 
+    const now = new Date();
+    if (backupMethod.isLockedAt(now)) {
+      return Result.err(new AccountLockedError("Authentication attempts are rate-limited."));
+    }
+
     const hashes = parseStoredHashes(backupMethod.secret);
     if (hashes === null) {
       return Result.ok({ kind: "failed" });
@@ -55,6 +62,8 @@ export class ConsumeBackupCode {
     }
 
     if (matchedIndex === -1) {
+      backupMethod.recordFailedAttempt(now);
+      await this.mfaMethodRepository.save(backupMethod);
       await this.auditLogger.record("backup_code.failed", userId);
       return Result.ok({ kind: "failed" });
     }
@@ -62,8 +71,9 @@ export class ConsumeBackupCode {
     // Match found. Consume the code by removing its hash.
     hashes.splice(matchedIndex, 1);
 
-    // Update the record with the remaining hashes.
-    backupMethod.updateSecret(JSON.stringify(hashes));
+    // Update the record with the remaining hashes and clear lockout / failure counter.
+    backupMethod.updateSecret(JSON.stringify(hashes), now);
+    backupMethod.recordUse(now);
     await this.mfaMethodRepository.save(backupMethod);
 
     await this.auditLogger.record("backup_code.consumed", userId, {
