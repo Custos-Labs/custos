@@ -17,12 +17,14 @@ import {
   AuthenticateWithPassword,
   ConfirmEmailVerification,
   ConfirmPasswordReset,
+  DEFAULT_LOCKOUT_POLICY,
   NoSessionsRevoker,
   NullCredentialNotifier,
   PrismaCredentialsUnitOfWork,
   RegisterUserWithPassword,
   RequestEmailVerification,
   RequestPasswordReset,
+  type MfaChecker,
 } from "@verixa/credentials";
 import { PrismaClient } from "@verixa/database";
 import {
@@ -40,10 +42,14 @@ import {
   InMemoryMfaMethodRepository,
   InMemoryWebAuthnChallengeRepository,
   InMemoryWebAuthnCredentialRepository,
+  MfaEnforcementPolicy,
   RegisterWebAuthnCredential,
   VerifyWebAuthnAssertion,
   WebAuthnAssertionVerifier,
   WebAuthnAttestationVerifier,
+  type MfaEnforcementLevel,
+  type MfaMethodRepository,
+  type MfaMethodType,
 } from "@verixa/mfa";
 import { InMemoryEventPublisher, type DomainEventPublisher } from "@verixa/shared-kernel";
 import { NoopRateLimiter } from "@verixa/shared-kernel/infrastructure/adapters/noop-rate-limiter.js";
@@ -51,6 +57,7 @@ import {
   AnchorBalanceMonitor,
   HorizonAccountBalanceReader,
   AlwaysAllowRateLimiter,
+  asId,
   InMemoryEventPublisher,
   type DomainEventPublisher,
 } from "@verixa/shared-kernel";
@@ -292,6 +299,48 @@ export interface Container {
 }
 
 /**
+ * `MfaChecker` backed by the real method repository and the configured
+ * global enforcement default.
+ *
+ * There is no per-user / per-organization override store yet, so policy
+ * resolution is the global `MFA_ENFORCEMENT_LEVEL` run through
+ * `MfaEnforcementPolicy.resolve` — the seam where an override repository
+ * plugs in later without touching the login path.
+ */
+class ConfigMfaChecker implements MfaChecker {
+  constructor(
+    private readonly mfaMethodRepo: MfaMethodRepository,
+    private readonly enforcementLevel?: MfaEnforcementLevel | (() => MfaEnforcementLevel),
+    private readonly allowedMethods?: readonly MfaMethodType[] | (() => readonly MfaMethodType[]),
+  ) {}
+
+  resolvePolicy(): Promise<MfaEnforcementLevel> {
+    const level =
+      typeof this.enforcementLevel === "function"
+        ? this.enforcementLevel()
+        : (this.enforcementLevel ?? loadConfig().MFA_ENFORCEMENT_LEVEL);
+    const methods =
+      typeof this.allowedMethods === "function"
+        ? this.allowedMethods()
+        : (this.allowedMethods ?? (loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[]));
+
+    return Promise.resolve(
+      MfaEnforcementPolicy.resolve({
+        globalDefault: level,
+        allowedMethods: methods,
+      }).level,
+    );
+  }
+
+  async listActiveMethods(
+    userId: string,
+  ): Promise<readonly { readonly id: string; readonly type: string }[]> {
+    const methods = await this.mfaMethodRepo.findActiveByUserId(asId<"UserId">(userId));
+    return methods.map((method) => ({ id: method.id, type: method.type }));
+  }
+}
+
+/**
  * Pieces a deployment must supply because they cannot be derived from
  * environment variables alone.
  */
@@ -311,6 +360,8 @@ export interface ContainerOverrides {
    * Defaults to `console`.
    */
   readonly logger?: StructuredErrorLogger | undefined;
+  /** Test seam: inject the MFA method repository so tests can enroll methods. */
+  readonly mfaMethodRepository?: MfaMethodRepository | undefined;
 }
 
 /**
@@ -462,7 +513,12 @@ export function buildContainer(
   const webauthnUsingDefaults =
     process.env["WEBAUTHN_RP_ID"] === undefined || process.env["WEBAUTHN_ORIGIN"] === undefined;
 
-  const mfaMethodRepo = new InMemoryMfaMethodRepository();
+  const mfaMethodRepo = overrides.mfaMethodRepository ?? new InMemoryMfaMethodRepository();
+  const mfaChecker: MfaChecker = new ConfigMfaChecker(
+    mfaMethodRepo,
+    () => loadConfig().MFA_ENFORCEMENT_LEVEL,
+    () => loadConfig().MFA_ALLOWED_METHODS as MfaMethodType[],
+  );
   const webAuthnCredentialRepo = new InMemoryWebAuthnCredentialRepository();
   const webAuthnChallengeRepo = new InMemoryWebAuthnChallengeRepository();
   const attestationVerifier = new WebAuthnAttestationVerifier();
@@ -518,6 +574,8 @@ export function buildContainer(
         credentialsUnitOfWork,
         passwordHasher,
         rateLimiter,
+        DEFAULT_LOCKOUT_POLICY,
+        mfaChecker,
       ),
       requestEmailVerification: new RequestEmailVerification(
         credentialsUnitOfWork,
