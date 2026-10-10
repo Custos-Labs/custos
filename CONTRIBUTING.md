@@ -88,3 +88,14 @@ review — without them, that information gets pulled out one comment at a
 time, which costs more of a maintainer's time, in public, than asking for it
 up front in a template. [`.github/CODEOWNERS`](.github/CODEOWNERS) defines
 who's automatically requested for review.
+
+## `planning/` — tracked, but not linted or shipped
+
+The `planning/` directory (roadmap, architecture notes, per-issue plans) is
+**tracked in git**: it is internal working material, not secret. It is
+deliberately excluded from the other two lists, and the split is intentional:
+
+- ESLint ignores `planning/**` (`eslint.config.mjs`) — these are prose notes, not code.
+- Docker excludes `planning/` (`.dockerignore`) — planning notes don't ship in images.
+
+If you add another top-level working directory with the same "internal but tracked" status, mirror this split: track it, ignore it in ESLint, exclude it in `.dockerignore`.
