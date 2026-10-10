@@ -7,6 +7,7 @@ on:
 
 jobs:
   ci:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     services:
       # Backs tests/integration/database.spec.ts (Issue 041) — a real
@@ -201,6 +202,7 @@ jobs:
   # REQUIRE_DATABASE_TESTS=1 makes it a hard failure rather than a skip, so
   # "Testcontainers silently didn't work" cannot pass as green.
   testcontainers:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
       REQUIRE_DATABASE_TESTS: "1"
@@ -270,6 +272,7 @@ jobs:
   # the role get created, is it actually unprivileged, and does it have
   # exactly the grants the application needs.
   compose-database-roles:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://verixa:verixa@localhost:5432/verixa
@@ -361,6 +364,7 @@ jobs:
         run: docker compose down -v || true
 
   docker:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

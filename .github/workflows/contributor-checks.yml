@@ -38,6 +38,7 @@ jobs:
   # Blocking: the architecture rules this codebase actually rests on.
   # ---------------------------------------------------------------------------
   architecture:
+    timeout-minutes: 30
     name: Architecture boundaries
     runs-on: ubuntu-latest
     steps:
@@ -114,6 +115,7 @@ jobs:
   # Blocking: secrets. Cheap to check, expensive to get wrong.
   # ---------------------------------------------------------------------------
   secrets:
+    timeout-minutes: 15
     name: No secrets committed
     runs-on: ubuntu-latest
     steps:
@@ -149,6 +151,7 @@ jobs:
   # Advisory: reviewability. Comments rather than blocks.
   # ---------------------------------------------------------------------------
   reviewability:
+    timeout-minutes: 15
     name: Pull request shape
     runs-on: ubuntu-latest
     steps:
@@ -279,6 +282,7 @@ jobs:
   # Advisory: did new behaviour arrive with tests?
   # ---------------------------------------------------------------------------
   test-coverage:
+    timeout-minutes: 20
     name: New code has tests
     runs-on: ubuntu-latest
     steps:
@@ -323,6 +327,7 @@ jobs:
   # Dependency review on anything touching the lockfile.
   # ---------------------------------------------------------------------------
   dependencies:
+    timeout-minutes: 20
     name: Dependency review
     runs-on: ubuntu-latest
     steps:
@@ -368,6 +373,7 @@ jobs:
   # Welcome first-time contributors.
   # ---------------------------------------------------------------------------
   welcome:
+    timeout-minutes: 10
     name: First-time contributor
     runs-on: ubuntu-latest
     if: github.event.action == 'opened'
