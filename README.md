@@ -157,10 +157,18 @@ curl http://localhost:3000/health
 # {"status":"ok"}
 ```
 
-Prefer one command and don't want Node/pnpm installed locally at all? Run the
-full stack (API + Postgres + Redis) in Docker instead:
+Prefer Docker and don't want Node/pnpm installed locally at all? Configure
+`.env` and run the full stack (API + Postgres + Redis) in Docker:
 
 ```bash
+# 1. Prepare environment configuration with required secrets:
+cp .env.example .env
+
+# Generate the two secrets required by the API:
+# - SESSION_ACCESS_TOKEN_SECRET (>= 32 chars): openssl rand -base64 48
+# - MFA_ENCRYPTION_KEY (32-byte base64): openssl rand -base64 32
+
+# 2. Start the stack:
 docker compose up
 ```
 
