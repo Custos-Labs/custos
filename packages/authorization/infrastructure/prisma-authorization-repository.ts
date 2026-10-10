@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { PrismaClient } from "@verixa/database";
+import { PrismaClientKnownRequestError, type PrismaClient } from "@verixa/database";
 
 import type { AuthorizationRepository } from "../application/authorization-repository.js";
 import {
@@ -152,7 +152,14 @@ export class PrismaAuthorizationRepository implements AuthorizationRepository {
   }
 
   async revokeAssignment(id: string): Promise<void> {
-    await this.prisma.userRoleAssignment.delete({ where: { id } });
+    try {
+      await this.prisma.userRoleAssignment.delete({ where: { id } });
+    } catch (error) {
+      if (error instanceof PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new AuthorizationError("NOT_FOUND");
+      }
+      throw error;
+    }
   }
 
   async hasPermission(
