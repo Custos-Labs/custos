@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@verixa/database";
 import { Result } from "@verixa/shared-kernel";
@@ -38,10 +40,51 @@ import { PrismaUserRepository } from "../infrastructure/persistence/prisma-user-
  * measured the same way on the same hardware.
  */
 
-const ITERATIONS = Number(process.env["BENCH_ITERATIONS"] ?? 200);
-const WARMUP = Number(process.env["BENCH_WARMUP"] ?? 20);
+export const DEFAULT_BENCHMARK_ITERATIONS = 200;
+export const DEFAULT_BENCHMARK_WARMUP = 20;
 
-interface Measurement {
+export interface BenchmarkConfig {
+  readonly iterations: number;
+  readonly warmup: number;
+  readonly databaseUrl: string;
+}
+
+export function parseBenchmarkConfig(env: NodeJS.ProcessEnv = process.env): BenchmarkConfig {
+  const databaseUrl = env["DATABASE_URL"];
+  if (!databaseUrl || databaseUrl.trim() === "") {
+    throw new Error("DATABASE_URL environment variable is required to run benchmarks");
+  }
+
+  const iterationsRaw = env["BENCH_ITERATIONS"];
+  const iterations =
+    iterationsRaw !== undefined && iterationsRaw !== ""
+      ? Number(iterationsRaw)
+      : DEFAULT_BENCHMARK_ITERATIONS;
+
+  if (Number.isNaN(iterations) || !Number.isInteger(iterations) || iterations <= 0) {
+    throw new Error(
+      `Invalid BENCH_ITERATIONS: expected positive integer, got "${String(iterationsRaw)}"`,
+    );
+  }
+
+  const warmupRaw = env["BENCH_WARMUP"];
+  const warmup =
+    warmupRaw !== undefined && warmupRaw !== "" ? Number(warmupRaw) : DEFAULT_BENCHMARK_WARMUP;
+
+  if (Number.isNaN(warmup) || !Number.isInteger(warmup) || warmup < 0) {
+    throw new Error(
+      `Invalid BENCH_WARMUP: expected non-negative integer, got "${String(warmupRaw)}"`,
+    );
+  }
+
+  return {
+    iterations,
+    warmup,
+    databaseUrl,
+  };
+}
+
+export interface Measurement {
   readonly operation: string;
   readonly p50: number;
   readonly p95: number;
@@ -50,7 +93,7 @@ interface Measurement {
   readonly max: number;
 }
 
-function percentile(sortedMs: number[], p: number): number {
+export function percentile(sortedMs: number[], p: number): number {
   if (sortedMs.length === 0) return 0;
   // Nearest-rank: the smallest value at or above the given percentile. Simple
   // and honest about being an estimate at these sample sizes — interpolating
@@ -63,20 +106,22 @@ function percentile(sortedMs: number[], p: number): number {
   return sortedMs.at(index) ?? 0;
 }
 
-async function measure(
+export async function measure(
   operation: string,
   run: (i: number) => Promise<unknown>,
+  iterations = DEFAULT_BENCHMARK_ITERATIONS,
+  warmup = DEFAULT_BENCHMARK_WARMUP,
 ): Promise<Measurement> {
   // Warm-up runs are discarded. The first few calls pay for connection
   // establishment, Prisma's query-engine startup, and a cold buffer cache —
   // costs that are real but one-off, and that would otherwise dominate the
   // max and distort p95.
-  for (let i = 0; i < WARMUP; i += 1) {
+  for (let i = 0; i < warmup; i += 1) {
     await run(-1 - i);
   }
 
   const samples: number[] = [];
-  for (let i = 0; i < ITERATIONS; i += 1) {
+  for (let i = 0; i < iterations; i += 1) {
     const started = performance.now();
     await run(i);
     samples.push(performance.now() - started);
@@ -102,10 +147,9 @@ function makeUser(seed: string): User {
   return User.register({ email: email.value, displayName: displayName.value });
 }
 
-async function main(): Promise<void> {
-  const databaseUrl =
-    process.env["DATABASE_URL"] ?? "postgres://verixa:verixa@localhost:5432/verixa";
-  const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
+  const config = parseBenchmarkConfig(env);
+  const prisma = new PrismaClient({ datasources: { db: { url: config.databaseUrl } } });
   const users = new PrismaUserRepository(prisma);
 
   const seeded: User[] = [];
@@ -114,48 +158,73 @@ async function main(): Promise<void> {
   try {
     await prisma.$connect();
 
-    console.log(`Benchmarking against ${databaseUrl.replace(/:[^:@]*@/, ":***@")}`);
-    console.log(`${String(ITERATIONS)} iterations, ${String(WARMUP)} warm-up\n`);
+    console.log(`Benchmarking against ${config.databaseUrl.replace(/:[^:@]*@/, ":***@")}`);
+    console.log(`${String(config.iterations)} iterations, ${String(config.warmup)} warm-up\n`);
 
     results.push(
-      await measure("UserRepository.save (insert)", async (i) => {
-        const user = makeUser(`${randomUUID()}-${String(i)}`);
-        await users.save(user);
-        if (i >= 0) seeded.push(user);
-      }),
+      await measure(
+        "UserRepository.save (insert)",
+        async (i) => {
+          const user = makeUser(`${randomUUID()}-${String(i)}`);
+          await users.save(user);
+          if (i >= 0) seeded.push(user);
+        },
+        config.iterations,
+        config.warmup,
+      ),
     );
 
     if (seeded.length === 0) throw new Error("no users were seeded");
 
     results.push(
-      await measure("UserRepository.findById", async (i) => {
-        const user = seeded[Math.abs(i) % seeded.length];
-        return users.findById(user?.id as UserId);
-      }),
+      await measure(
+        "UserRepository.findById",
+        async (i) => {
+          const user = seeded[Math.abs(i) % seeded.length];
+          return users.findById(user?.id as UserId);
+        },
+        config.iterations,
+        config.warmup,
+      ),
     );
 
     results.push(
-      await measure("UserRepository.findByEmail", async (i) => {
-        const user = seeded[Math.abs(i) % seeded.length];
-        if (user === undefined) return undefined;
-        return users.findByEmail(user.email);
-      }),
+      await measure(
+        "UserRepository.findByEmail",
+        async (i) => {
+          const user = seeded[Math.abs(i) % seeded.length];
+          if (user === undefined) return undefined;
+          return users.findByEmail(user.email);
+        },
+        config.iterations,
+        config.warmup,
+      ),
     );
 
     results.push(
-      await measure("UserRepository.existsByEmail", async (i) => {
-        const user = seeded[Math.abs(i) % seeded.length];
-        if (user === undefined) return false;
-        return users.existsByEmail(user.email);
-      }),
+      await measure(
+        "UserRepository.existsByEmail",
+        async (i) => {
+          const user = seeded[Math.abs(i) % seeded.length];
+          if (user === undefined) return false;
+          return users.existsByEmail(user.email);
+        },
+        config.iterations,
+        config.warmup,
+      ),
     );
 
     results.push(
-      await measure("UserRepository.save (update)", async (i) => {
-        const user = seeded[Math.abs(i) % seeded.length];
-        if (user === undefined) return;
-        await users.save(user);
-      }),
+      await measure(
+        "UserRepository.save (update)",
+        async (i) => {
+          const user = seeded[Math.abs(i) % seeded.length];
+          if (user === undefined) return;
+          await users.save(user);
+        },
+        config.iterations,
+        config.warmup,
+      ),
     );
 
     console.log("| Operation | p50 (ms) | p95 (ms) | p99 (ms) | min | max |");
@@ -174,7 +243,13 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error("Benchmark failed:", error);
-  process.exitCode = 1;
-});
+const isMainModule = Boolean(
+  process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url)),
+);
+
+if (isMainModule) {
+  main().catch((error: unknown) => {
+    console.error("Benchmark failed:", error);
+    process.exitCode = 1;
+  });
+}
