@@ -28,7 +28,7 @@
   "dependencies": {
     "@verixa/database": "workspace:*",
     "@verixa/shared-kernel": "workspace:*",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@stellar/stellar-sdk": "^17.2.1",
