@@ -19,7 +19,7 @@
     "@verixa/shared-kernel": "workspace:*"
   },
   "devDependencies": {
-    "@testcontainers/postgresql": "^12.1.0",
+    "@testcontainers/postgresql": "^12.2.1",
     "@types/node": "^26.6.4",
     "@vitest/coverage-v8": "^5.0.3",
     "tsx": "^4.23.13",
