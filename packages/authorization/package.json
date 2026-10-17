@@ -17,7 +17,7 @@
     "@verixa/shared-kernel": "workspace:*"
   },
   "devDependencies": {
-    "@testcontainers/postgresql": "^12.1.0",
+    "@testcontainers/postgresql": "^12.2.1",
     "@prisma/client": "^6.2.1",
     "@types/node": "^26.6.4",
     "@types/supertest": "^7.2.1",
