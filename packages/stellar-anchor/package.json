@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node init && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -16,7 +16,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^17.2.1",
+    "@stellar/stellar-sdk": "^17.3.0",
     "@verixa/shared-kernel": "workspace:*"
   },
   "devDependencies": {

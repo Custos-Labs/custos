@@ -132,8 +132,8 @@ importers:
         version: 4.6.5
     devDependencies:
       '@stellar/stellar-sdk':
-        specifier: ^17.2.1
-        version: 17.2.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+        specifier: ^17.3.0
+        version: 17.3.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       '@types/node':
         specifier: ^26.6.4
         version: 26.6.4
@@ -386,8 +386,8 @@ importers:
   packages/stellar-anchor:
     dependencies:
       '@stellar/stellar-sdk':
-        specifier: ^17.2.1
-        version: 17.2.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+        specifier: ^17.3.0
+        version: 17.3.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       '@verixa/shared-kernel':
         specifier: workspace:*
         version: link:../shared-kernel
@@ -1371,8 +1371,8 @@ packages:
     resolution: {integrity: sha512-HBDNKnxr+ecdaEmbZ0mcKkirOF8tXXEbWSw34P3wT40Tn3g+u+cCH17xAWZymzscq8cojHB8340pR8QNVaD32w==}
     engines: {node: '>=22.0.0', pnpm: '>=10.0.0'}
 
-  '@stellar/stellar-sdk@17.2.1':
-    resolution: {integrity: sha512-kIyfnZ2zCOqV8SUJcsk9buBOvhH1wsLU7KAzqAJyY7AgmD+KdvLTMpI1gcYdhGSakuDG5s6xSO4EN9HZTxpm8g==}
+  '@stellar/stellar-sdk@17.3.0':
+    resolution: {integrity: sha512-E9olNBk1FDTYSdGphd+U4EMlbRdkCQfveuK7/fhEtlEBl7GIoXtHHr0Hh6WcxIiO0/sRutsgapZDhhGpdd/Bqg==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
@@ -2421,8 +2421,8 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
-  follow-redirects@1.16.0:
-    resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
+  follow-redirects@1.16.1:
+    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -3140,8 +3140,8 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  smol-toml@1.9.0:
-    resolution: {integrity: sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ==}
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
     engines: {node: '>= 18'}
 
   sonic-boom@4.2.1:
@@ -4168,7 +4168,7 @@ snapshots:
 
   '@stellar/js-xdr@5.0.0': {}
 
-  '@stellar/stellar-sdk@17.2.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)':
+  '@stellar/stellar-sdk@17.3.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)':
     dependencies:
       '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
       '@noble/ed25519': 3.2.0
@@ -4180,7 +4180,7 @@ snapshots:
       commander: 14.0.3
       eventsource: 4.1.1
       feaxios: 0.0.23
-      smol-toml: 1.9.0
+      smol-toml: 1.9.1
       uint8array-extras: 1.6.0
     transitivePeerDependencies:
       - debug
@@ -4494,7 +4494,7 @@ snapshots:
 
   '@verixa/stellar-anchor@file:packages/stellar-anchor(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)':
     dependencies:
-      '@stellar/stellar-sdk': 17.2.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
+      '@stellar/stellar-sdk': 17.3.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)
       '@verixa/shared-kernel': file:packages/shared-kernel
     transitivePeerDependencies:
       - debug
@@ -4632,7 +4632,7 @@ snapshots:
 
   axios@1.20.0(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0):
     dependencies:
-      follow-redirects: 1.16.0(debug@4.4.3(supports-color@7.2.0))
+      follow-redirects: 1.16.1(debug@4.4.3(supports-color@7.2.0))
       form-data: 4.0.6
       https-proxy-agent: 5.0.1(supports-color@7.2.0)
       proxy-from-env: 2.1.0
@@ -5252,7 +5252,7 @@ snapshots:
 
   flatted@3.4.4: {}
 
-  follow-redirects@1.16.0(debug@4.4.3(supports-color@7.2.0)):
+  follow-redirects@1.16.1(debug@4.4.3(supports-color@7.2.0)):
     optionalDependencies:
       debug: 4.4.3(supports-color@7.2.0)
 
@@ -5952,7 +5952,7 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  smol-toml@1.9.0: {}
+  smol-toml@1.9.1: {}
 
   sonic-boom@4.2.1:
     dependencies:
