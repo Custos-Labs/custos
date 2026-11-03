@@ -32,7 +32,7 @@
   },
   "devDependencies": {
     "@stellar/stellar-sdk": "^17.2.1",
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "@verixa/stellar-anchor": "workspace:*",
     "@vitest/coverage-v8": "^5.0.3",
     "tsx": "^4.23.1",
