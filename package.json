@@ -15,8 +15,8 @@
     "db:migrate": "pnpm --filter @verixa/database run db:migrate",
     "db:migrate:deploy": "pnpm --filter @verixa/database run db:migrate:deploy",
     "db:migrate:status": "pnpm --filter @verixa/database run db:migrate:status",
-    "build": "node api.js && pnpm -r run build",
-    "dev": "node api.js && pnpm --filter @verixa/api^... run build && pnpm --filter @verixa/api run dev",
+    "build": "node init && pnpm -r run build",
+    "dev": "node init && pnpm --filter @verixa/api^... run build && pnpm --filter @verixa/api run dev",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r --workspace-concurrency=1 run test",
     "test:coverage": "pnpm -r run test:coverage",
@@ -42,14 +42,14 @@
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.12.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import-x": "^4.5.0",
-    "eslint-plugin-security": "^4.2.0",
+    "eslint-plugin-security": "^4.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",
     "prettier": "^3.4.2",
-    "typescript-eslint": "^8.71.1"
+    "typescript-eslint": "^8.72.1"
   }
 }
