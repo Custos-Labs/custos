@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "node -e \"console.log('packages/sessions is QUARANTINED - see QUARANTINE.md in this package. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
+    "build": "node init && node -e \"console.log('packages/sessions is QUARANTINED - see QUARANTINE.md in this package. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
     "typecheck": "node -e \"console.log('packages/sessions is QUARANTINED - see QUARANTINE.md in this package. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
     "test": "node -e \"console.log('packages/sessions is QUARANTINED - see QUARANTINE.md in this package. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
     "test:coverage": "node -e \"console.log('packages/sessions is QUARANTINED - see QUARANTINE.md in this package. It does not build: pull requests were merged without resolving conflicts, leaving multiple implementations concatenated.')\"",
